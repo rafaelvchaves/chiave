@@ -6,15 +6,17 @@ type Event[D any] struct {
 	Data D
 }
 
-type CmRDT[V any, S any, C any, D any] interface {
-	// S is the internal state: it's what you get when you query, and also is updated in Effect.
-	// V??
-	// C is the command type
-	Init()
-	Query(v V) S
-	Prepare(v V, cmd C) D // side effect free
-	Effect(v V, e Event[D])
+type Operation[V any, D any] interface {
+	Prepare(V) Event[D]
+	Effect(Event[D])
 }
+
+
+type CmRDT struct {
+	operations []Operation[any, any]
+}
+
+
 
 type Counter struct {
 	i int
@@ -49,94 +51,78 @@ func (g *Graph) Init() {
 	g.edges = NewSet[Pair[Edge, Tag]]()
 }
 
-type Opts struct {
-	Kind string
-}
-
-func (g *Graph) ContainsVertex(v Vertex) bool {
-	ok := g.vertices.Exists(EqVertex(v))
+func (g *Graph) LookupVertex(v Vertex) bool {
+	ok := g.vertices.Exists(EqualsVertex(v))
 	return ok
 }
 
-
-func (g *Graph) ContainsEdge(v1, v2 Vertex) bool {
-	e := Edge{v1, v2}
-	ok := g.edges.Exists(EqEdge(e))
-	return ok && g.ContainsVertex(v1) && g.ContainsVertex(v2)
+func (g *Graph) LookupEdge(e Edge) bool {
+	ok := g.edges.Exists(EqualsEdge(e))
+	v1, v2 := e.fst, e.snd
+	return ok && g.LookupVertex(v1) && g.LookupVertex(v2)
 }
 
-func (g *Graph) PrepareAddVertex(v string) (string, bool) {
-	return uuid.New().String(), true
-}
+func (g *Graph) PrepareAddVertex(v Vertex) (Pair[Vertex, Tag], bool) {
+	w := uuid.New().String()
+	return Pair[Vertex, Tag]{v, w}, true
+}	
 
-func (g *Graph) EffectAddVertex(v string, w string) {
-	g.vertices.Add(Pair[string, string]{v, w})
+func (g *Graph) EffectAddVertex(p Pair[Vertex, Tag]) {
+	g.vertices.Add(p)
 }
-
-func EqVertex(v Vertex) func(Pair[Vertex, Tag]) bool {
-	return func(p Pair[Vertex, Tag]) bool { return p.fst == v }
-}
-
-func EqEdge(e Edge) func(Pair[Edge, Tag]) bool {
-	return func(p Pair[Edge, Tag]) bool { return p.fst == e }
-}
-
-func (g *Graph) PrepareRemoveVertex(v string) (s Set[Pair[Vertex, Tag]], ok bool) {
-	ok = g.ContainsVertex(v) && !g.edges.Exists(
-		func (p Pair[Edge, Tag]) bool { return p.fst.fst == v },
+func (g *Graph) PrepareRemoveVertex(v Vertex) (R Set[Pair[Vertex, Tag]], ok bool) {
+	ok = g.LookupVertex(v) && !g.edges.Exists(
+		func(p Pair[Edge, Tag]) bool { return p.fst.fst == v }, // ensure no edges are coming out of v
 	)
 	if !ok {
 		return
 	}
-	s = g.vertices.Filter(EqVertex(v))
+	ok = true
+	R = g.vertices.Filter(EqualsVertex(v))
 	return
 }
 
-func (g *Graph) EffectRemoveVertex(v string) {
+// Prepare: payload -> (operation, bool)
+// Effect: operation -> unit
 
+func (g *Graph) EffectRemoveVertex(R Set[Pair[Vertex, Tag]]) {
+	g.vertices.Subtract(R)
 }
 
-func (g *Graph) AddEdge(v1, v2 string) {
-
-}
-
-func (g *Graph) RemoveEdge(v1, v2 string) {
-
-}
-
-func test() {
-	for {
-		// listen for updates
-
-		// listen for client requests
-
-		// send updates to others
-
-		//
+func (g *Graph) PrepareAddEdge(v1, v2 Vertex) (p Pair[Edge, Tag], ok bool) {
+	if !g.LookupVertex(v1) {
+		return
 	}
+	ok = true
+	e := Edge{v1, v2}
+	w := uuid.New().String()
+	p = Pair[Edge, Tag]{e, w}
+	return
 }
 
-type MyCounter struct {
-	i int
+func (g *Graph) EffectAddEdge(p Pair[Edge, Tag]) {
+	g.edges.Add(p)
 }
 
-func (m *MyCounter) Increment() {
-	m.i++
+func (g *Graph) PrepareRemoveEdge(v1, v2 Vertex) (R Set[Pair[Edge, Tag]], ok bool) {
+	e := Edge{v1, v2}
+	if !g.LookupEdge(e) {
+		return
+	}
+	ok = true
+	R = g.edges.Filter(EqualsEdge(e))
+	return
 }
 
-func (m *MyCounter) Decrement() {
-	m.i--
+func (g *Graph) EffectRemoveEdge(R Set[Pair[Edge, Tag]]) {
+	g.edges.Subtract(R)
 }
 
-func (m *MyCounter) Value() int {
-	return m.i
+func EqualsVertex(v Vertex) func(Pair[Vertex, Tag]) bool {
+	return func(p Pair[Vertex, Tag]) bool { return p.fst == v }
 }
 
-type CvRDT[S any, V any] interface {
-	Value() V
-	Merge(so S)
+func EqualsEdge(e Edge) func(Pair[Edge, Tag]) bool {
+	return func(p Pair[Edge, Tag]) bool { return p.fst == e }
 }
 
-func Init(n int) {
-
-}
