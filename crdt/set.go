@@ -42,13 +42,13 @@ func (s *Set[T]) Filter(f func(T) bool) Set[T] {
 	return filtered
 }
 
-func (s *Set[T]) Union(other *Set[T]) {
+func (s *Set[T]) Union(other Set[T]) {
 	for k := range other.s {
 		s.s[k] = struct{}{}
 	}
 }
 
-func (s *Set[T]) Diff(other *Set[T]) {
+func (s *Set[T]) Subtract(other Set[T]) {
 	for k := range s.s {
 		if _, ok := other.s[k]; ok {
 			delete(s.s, k)
