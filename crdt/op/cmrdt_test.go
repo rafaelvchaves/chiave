@@ -1,26 +1,28 @@
 package crdt
 
-import "testing"
+import (
+	"testing"
+)
 
 var graphHandlers = map[string]Handler[Graph]{
 	"ADDV": AddVertexHandler{},
-	"RMV": RemoveVertexHandler{},
+	"RMV":  RemoveVertexHandler{},
 	"ADDE": AddEdgeHandler{},
-	"RME": RemoveEdgeHandler{},
+	"RME":  RemoveEdgeHandler{},
 }
 
 var graphQueries = map[string]Query[Graph]{
-	"NEIGH": NeighborQuery{},
+	"NEIGH":   NeighborQuery{},
 	"EXISTSV": ExistsVertexQuery{},
 	"EXISTSE": ExistsEdgeQuery{},
 }
 
-var counterHandlers = map[string]Handler[Counter] {
+var counterHandlers = map[string]Handler[Counter]{
 	"INC": IncrementHandler{},
 	"DEC": DecrementHandler{},
 }
 
-var counterQueries = map[string]Query[Counter] {
+var counterQueries = map[string]Query[Counter]{
 	"VALUE": ValueQuery{},
 }
 
@@ -45,6 +47,36 @@ func TestAddVertex(t *testing.T) {
 	}
 	if exists != "true" {
 		t.Errorf("Query(EXISTSV b): expected true, got %s", exists)
+	}
+	neighbors, err := g.Query("NEIGH", "a")
+	if err != nil {
+		t.Fatalf("unexpected Query() error: %q", err)
+	}
+	if neighbors != "{}" {
+		t.Errorf("Query(NEIGH a): expected {}, got %q", neighbors)
+	}
+}
+
+func TestAddEdge(t *testing.T) {
+	g := Init(NewGraph(), graphHandlers, graphQueries)
+	g.Process("ADDV", "a")
+	g.Process("ADDV", "b")
+	g.Process("ADDV", "c")
+	g.Process("ADDE", NewEdge("a", "b"))
+	g.Process("ADDE", NewEdge("a", "c"))
+	neighbors, err := g.Query("NEIGH", "a")
+	if err != nil {
+		t.Fatalf("unexpected Query() error: %q", err)
+	}
+	if neighbors != "{b, c}" {
+		t.Errorf("Query(NEIGH a): expected {b, c}, got %q", neighbors)
+	}
+	neighbors, err = g.Query("NEIGH", "b")
+	if err != nil {
+		t.Fatalf("unexpected Query() error: %q", err)
+	}
+	if neighbors != "{}" {
+		t.Errorf("Query(NEIGH b): expected {}, got %q", neighbors)
 	}
 }
 
