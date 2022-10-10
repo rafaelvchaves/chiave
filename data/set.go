@@ -1,10 +1,17 @@
 package data
 
-type Set[T comparable] struct {
+import "fmt"
+
+type Element interface {
+	comparable
+	fmt.Stringer
+}
+
+type Set[T Element] struct {
 	s map[T]struct{}
 }
 
-func NewSet[T comparable]() Set[T] {
+func NewSet[T Element]() Set[T] {
 	return Set[T]{
 		s: make(map[T]struct{}),
 	}
@@ -54,4 +61,18 @@ func (s *Set[T]) Subtract(other Set[T]) {
 			delete(s.s, k)
 		}
 	}
+}
+
+func (s *Set[T]) String() string {
+	str := "{"
+	n := len(s.s)
+	i := 0
+	for k := range s.s {
+		i++
+		str += k.String()
+		if i < n-1 {
+			str += ", "
+		}
+	}
+	return str + "}"
 }
