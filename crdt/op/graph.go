@@ -6,6 +6,16 @@ import (
 	"github.com/google/uuid"
 )
 
+const (
+	AddVertexCmd = "ADDV"
+	AddEdgeCmd = "ADDE"
+	RemoveVertexCmd = "RMV"
+	RemoveEdgeCmd = "RME"
+	ExistsVertexCmd = "EXISTSV"
+	ExistsEdgeCmd = "EXISTSE"
+	NeighborsCmd = "NEIGH"
+)
+
 type Graph struct {
 	vertices data.Set[taggedVertex]
 	edges    data.Set[taggedEdge]

@@ -39,19 +39,19 @@ func Init[S any](state S, handlers map[string]Handler[S], queries map[string]Que
 	}
 }
 
-func (c *CmRDT[S]) Process(opName string, payload any) error {
+func (c *CmRDT[S]) Process(opName string, payload any) (any, error) {
 	handler, ok := c.handlers[opName]
 	if !ok {
-		return fmt.Errorf("could not find handler for operation %q", opName)
+		return "", fmt.Errorf("could not find handler for operation %q", opName)
 	}
 	operation, ok := handler.Prepare(c.state, payload)
 	if !ok {
 		c.opQueue = append(c.opQueue, operation)
-		return nil
+		return "", nil
 	}
 	handler.Effect(&c.state, operation)
 	// send update to others
-	return nil
+	return operation, nil
 }
 
 func (c *CmRDT[S]) Query(queryType string, args any) (string, error) {
