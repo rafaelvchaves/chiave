@@ -7,8 +7,8 @@ import (
 )
 
 type Graph struct {
-	vertices data.Set[data.Pair[Vertex, tag]]
-	edges    data.Set[data.Pair[Edge, tag]]
+	vertices data.Set[taggedVertex]
+	edges    data.Set[taggedEdge]
 }
 
 type Edge = data.Pair[string, string]
@@ -16,6 +16,10 @@ type Edge = data.Pair[string, string]
 type Vertex = string
 
 type tag = string
+
+type taggedVertex = data.Pair[Vertex, tag]
+
+type taggedEdge = data.Pair[Edge, tag]
 
 type Graph1 interface {
 	AddVertex(v Vertex)
@@ -26,9 +30,19 @@ type Graph1 interface {
 	LookupVertex(v Vertex) bool
 }
 
-func (g *Graph) Init() {
-	g.vertices = data.NewSet[data.Pair[Vertex, tag]]()
-	g.edges = data.NewSet[data.Pair[Edge, tag]]()
+func EqualsVertex(v Vertex) func(taggedVertex) bool {
+	return func(p taggedVertex) bool { return p.First == v }
+}
+
+func EqualsEdge(e Edge) func(taggedEdge) bool {
+	return func(p taggedEdge) bool { return p.First == e }
+}
+
+func NewGraph() Graph {
+	return Graph{
+		vertices: data.NewSet[taggedVertex](),
+		edges:  data.NewSet[taggedEdge](),
+	}
 }
 
 func (g *Graph) LookupVertex(v Vertex) bool {
@@ -44,24 +58,19 @@ func (g *Graph) LookupEdge(e Edge) bool {
 
 type AddVertexHandler struct{}
 
-func (_ AddVertexHandler) Prepare(_ Graph, v any) (any, bool) {
+func (AddVertexHandler) Prepare(_ Graph, val any) (any, bool) {
 	w := uuid.New().String()
-	return data.NewPair(v.(Vertex), w), true
+	return data.NewPair(val.(Vertex), w), true
 }
 
-func (_ AddVertexHandler) Effect(g *Graph, p any) {
+func (AddVertexHandler) Effect(g *Graph, p any) {
 	g.vertices.Add(p.(data.Pair[Vertex, tag]))
 }
 
-func (g *Graph) PrepareAddVertex(v Vertex) (data.Pair[Vertex, tag], bool) {
-	w := uuid.New().String()
-	return data.NewPair(v, w), true
-}
+type RemoveVertexHandler struct{}
 
-func (g *Graph) EffectAddVertex(p data.Pair[Vertex, tag]) {
-	g.vertices.Add(p)
-}
-func (g *Graph) PrepareRemoveVertex(v Vertex) (R data.Set[data.Pair[Vertex, tag]], ok bool) {
+func (RemoveVertexHandler) Prepare(g Graph, val any) (R any, ok bool) {
+	v := val.(Vertex)
 	ok = g.LookupVertex(v) && !g.edges.Exists(
 		func(p data.Pair[Edge, tag]) bool { return p.First.First == v }, // ensure no edges are coming out of v
 	)
@@ -73,11 +82,14 @@ func (g *Graph) PrepareRemoveVertex(v Vertex) (R data.Set[data.Pair[Vertex, tag]
 	return
 }
 
-func (g *Graph) EffectRemoveVertex(R data.Set[data.Pair[Vertex, tag]]) {
-	g.vertices.Subtract(R)
+func (RemoveVertexHandler) Effect(g *Graph, R any) {
+	g.vertices.Subtract(R.(data.Set[taggedVertex]))
 }
 
-func (g *Graph) PrepareAddEdge(e Edge) (p data.Pair[Edge, tag], ok bool) {
+type AddEdgeHandler struct{}
+
+func (AddEdgeHandler) Prepare(g Graph, val any) (p any, ok bool) {
+	e := val.(Edge)
 	if !g.LookupVertex(e.First) {
 		return
 	}
@@ -87,11 +99,14 @@ func (g *Graph) PrepareAddEdge(e Edge) (p data.Pair[Edge, tag], ok bool) {
 	return
 }
 
-func (g *Graph) EffectAddEdge(p data.Pair[Edge, tag]) {
-	g.edges.Add(p)
+func (AddEdgeHandler) Effect(g *Graph, p any) {
+	g.edges.Add(p.(taggedEdge))
 }
 
-func (g *Graph) PrepareRemoveEdge(e Edge) (R data.Set[data.Pair[Edge, tag]], ok bool) {
+type RemoveEdgeHandler struct{}
+
+func (RemoveEdgeHandler) Prepare(g Graph, val any) (R any, ok bool) {
+	e := val.(Edge)
 	if !g.LookupEdge(e) {
 		return
 	}
@@ -100,14 +115,44 @@ func (g *Graph) PrepareRemoveEdge(e Edge) (R data.Set[data.Pair[Edge, tag]], ok 
 	return
 }
 
-func (g *Graph) EffectRemoveEdge(R data.Set[data.Pair[Edge, tag]]) {
-	g.edges.Subtract(R)
+func (RemoveEdgeHandler) Effect(g *Graph, R any) {
+	g.edges.Subtract(R.(data.Set[taggedEdge]))
 }
 
-func EqualsVertex(v Vertex) func(data.Pair[Vertex, tag]) bool {
-	return func(p data.Pair[Vertex, tag]) bool { return p.First == v }
+type NeighborQuery struct{}
+
+func (NeighborQuery) Query(g Graph, args any) string {
+	v, ok := args.(Vertex)
+	if !ok {
+		return "{}"
+	}
+	edges := g.edges.Filter(func(p taggedEdge) bool { return p.First.First == v })
+	return edges.String()
 }
 
-func EqualsEdge(e Edge) func(data.Pair[Edge, tag]) bool {
-	return func(p data.Pair[Edge, tag]) bool { return p.First == e }
+type ExistsVertexQuery struct{}
+
+func (ExistsVertexQuery) Query(g Graph, args any) string {
+	v, ok := args.(Vertex)
+	if !ok {
+		return String(false)
+	}
+	return String(g.LookupVertex(v))
+}
+
+type ExistsEdgeQuery struct{}
+
+func (ExistsEdgeQuery) Query(g Graph, args any) string {
+	e, ok := args.(Edge)
+	if !ok {
+		return String(false)
+	}
+	return String(g.LookupEdge(e))
+}
+
+func String(b bool) string {
+	if b {
+		return "true"
+	}
+	return "false"
 }
