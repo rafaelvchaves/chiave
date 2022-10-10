@@ -2,12 +2,6 @@ package crdt
 
 import "fmt"
 
-// type Counter interface {
-// 	Increment()
-// 	Decrement()
-// 	Value() int
-// }
-
 type Counter int
 
 func NewCounter() Counter {

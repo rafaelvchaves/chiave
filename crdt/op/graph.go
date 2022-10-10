@@ -13,6 +13,10 @@ type Graph struct {
 
 type Edge = data.Pair[string, string]
 
+func NewEdge(a, b string) Edge {
+	return Edge{First: a, Second: b}
+}
+
 type Vertex = string
 
 type tag = string
@@ -41,7 +45,7 @@ func EqualsEdge(e Edge) func(taggedEdge) bool {
 func NewGraph() Graph {
 	return Graph{
 		vertices: data.NewSet[taggedVertex](),
-		edges:  data.NewSet[taggedEdge](),
+		edges:    data.NewSet[taggedEdge](),
 	}
 }
 
@@ -121,13 +125,24 @@ func (RemoveEdgeHandler) Effect(g *Graph, R any) {
 
 type NeighborQuery struct{}
 
+type str string
+
+func (s str) String() string {
+	return string(s)
+}
+
 func (NeighborQuery) Query(g Graph, args any) string {
 	v, ok := args.(Vertex)
 	if !ok {
 		return "{}"
 	}
-	edges := g.edges.Filter(func(p taggedEdge) bool { return p.First.First == v })
-	return edges.String()
+	neighbors := data.NewSet[str]()
+	g.edges.ForEach(func(p taggedEdge) {
+		if p.First.First == v {
+			neighbors.Add(str(p.First.Second))
+		}
+	})
+	return neighbors.String()
 }
 
 type ExistsVertexQuery struct{}
