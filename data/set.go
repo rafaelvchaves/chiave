@@ -62,17 +62,22 @@ func (s *Set[T]) Subtract(other Set[T]) {
 		}
 	}
 }
+func (s *Set[T]) ForEach(f func (T)) {
+	for k := range s.s {
+		f(k)
+	}
+}
 
 func (s *Set[T]) String() string {
 	str := "{"
 	n := len(s.s)
 	i := 0
 	for k := range s.s {
-		i++
 		str += k.String()
-		if i < n-1 {
+		if i < n - 1 {
 			str += ", "
 		}
+		i++
 	}
 	return str + "}"
 }
