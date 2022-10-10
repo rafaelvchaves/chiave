@@ -1,10 +1,10 @@
-package set
+package data
 
 type Set[T comparable] struct {
 	s map[T]struct{}
 }
 
-func New[T comparable]() Set[T] {
+func NewSet[T comparable]() Set[T] {
 	return Set[T]{
 		s: make(map[T]struct{}),
 	}
@@ -33,7 +33,7 @@ func (s *Set[T]) Exists(f func(T) bool) bool {
 }
 
 func (s *Set[T]) Filter(f func(T) bool) Set[T] {
-	filtered := New[T]()
+	filtered := NewSet[T]()
 	for k := range s.s {
 		if f(k) {
 			filtered.Add(k)
