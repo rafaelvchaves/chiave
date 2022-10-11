@@ -42,8 +42,8 @@ func (g *GCounter) Value() int {
 	return sum
 }
 
-func defaultZero(m map[string]int, k string) int {
-	v, ok := m[k]
+func (g *GCounter) SafeGet(r string) int {
+	v, ok := g.vec[r]
 	if !ok {
 		return 0
 	}
@@ -53,7 +53,7 @@ func defaultZero(m map[string]int, k string) int {
 func (g *GCounter) Compare(o GCounter) Ord {
 	ord := EQ
 	for k, va := range g.vec {
-		vb := defaultZero(o.vec, k)
+		vb := o.SafeGet(k)
 		switch {
 		case ord == EQ && va > vb:
 			ord = GT
@@ -70,7 +70,7 @@ func (g *GCounter) Compare(o GCounter) Ord {
 
 func (g *GCounter) Merge(o GCounter) {
 	for k, va := range g.vec {
-		vb := defaultZero(o.vec, k)
+		vb := o.SafeGet(k)
 		g.vec[k] = util.Max(va, vb)
 	}
 }
