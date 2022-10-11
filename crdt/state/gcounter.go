@@ -1,5 +1,7 @@
 package crdt
 
+import "kvs/util"
+
 type Ord int
 
 const (
@@ -18,7 +20,7 @@ func NewGCounter(id string) GCounter {
 	vec := make(map[string]int)
 	vec[id] = 0
 	return GCounter{
-		id: id,
+		id:  id,
 		vec: vec,
 	}
 }
@@ -69,13 +71,6 @@ func (g *GCounter) Compare(o GCounter) Ord {
 func (g *GCounter) Merge(o GCounter) {
 	for k, va := range g.vec {
 		vb := defaultZero(o.vec, k)
-		g.vec[k] = max(va, vb)
+		g.vec[k] = util.Max(va, vb)
 	}
-}
-
-func max(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
 }
