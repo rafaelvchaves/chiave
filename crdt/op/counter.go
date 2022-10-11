@@ -1,35 +1,27 @@
-package crdt
+package op
 
-import "fmt"
+import "kvs/crdt"
 
-type Counter int
-
-func NewCounter() Counter {
-	return Counter(0)
+type OCounter struct {
+	c int
 }
 
-type IncrementHandler struct{}
+var _ crdt.Counter = NewOCounter()
 
-func (IncrementHandler) Prepare(i Counter, _ any) (any, bool) {
-	return 1, true
+func NewOCounter() *OCounter {
+	return &OCounter{
+		c: 0,
+	}
 }
 
-func (IncrementHandler) Effect(i *Counter, val any) {
-	*i = *i + Counter(val.(int))
+func (o *OCounter) Value() int {
+	return int(o.c)
 }
 
-type DecrementHandler struct{}
-
-func (DecrementHandler) Prepare(i Counter, _ any) (any, bool) {
-	return 1, true
+func (o *OCounter) Increment() {
+	o.c += 1
 }
 
-func (DecrementHandler) Effect(i *Counter, val any) {
-	*i = *i - Counter(val.(int))
-}
-
-type ValueQuery struct{}
-
-func (ValueQuery) Query(i Counter, _ any) string {
-	return fmt.Sprintf("%d", i)
+func (o *OCounter) Decrement() {
+	o.c -= 1
 }
