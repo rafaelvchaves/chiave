@@ -6,8 +6,8 @@ type Event struct {
 }
 
 type CRDT interface {
-	GetEvents() []Event
-	PersistEvents([]Event)
+	GetEvent() Event
+	PersistEvent(Event)
 }
 
 

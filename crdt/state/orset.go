@@ -1,4 +1,4 @@
-package crdt
+package state
 
 import (
 	"kvs/data"

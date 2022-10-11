@@ -2,43 +2,47 @@ package op
 
 import "kvs/crdt"
 
-type OCounter struct {
-	c int
-	events []crdt.Event
+type Counter struct {
+	id      string
+	c       int
+	current crdt.Event
 }
 
-var _ crdt.Counter = NewOCounter()
-
-func NewOCounter() *OCounter {
-	return &OCounter{
-		c: 0,
+func NewCounter(id string) *Counter {
+	return &Counter{
+		id: id,
+		c:  0,
+		current: crdt.Event{
+			Source: id,
+		},
 	}
 }
 
-func (o *OCounter) Value() int {
-	return int(o.c)
+func (c *Counter) Value() int {
+	return int(c.c)
 }
 
-func (o *OCounter) Increment() {
-	o.c += 1
-	o.events = append(o.events, crdt.Event{Data: 1})
+func (c *Counter) Increment() {
+	c.c += 1
+	update, _ := c.current.Data.(int)
+	c.current.Data = update + 1
 }
 
-func (o *OCounter) Decrement() {
-	o.c -= 1
-	o.events = append(o.events, crdt.Event{Data: -1})
+func (c *Counter) Decrement() {
+	c.c -= 1
+	update, _ := c.current.Data.(int)
+	c.current.Data = update - 1
 }
 
-func (o *OCounter) GetEvents() []crdt.Event {
-	events := o.events
-	o.events = nil
-	return events
-}
-
-func (o *OCounter) PersistEvents(events []crdt.Event) {
-	for _, e := range events {
-		if d, ok := e.Data.(int); ok {
-			o.c += d
-		}
+func (c *Counter) GetEvent() crdt.Event {
+	current := c.current
+	c.current = crdt.Event{
+		Source: c.id,
 	}
+	return current
+}
+
+func (c *Counter) PersistEvent(event crdt.Event) {
+	update, _ := event.Data.(int)
+	c.c += update
 }

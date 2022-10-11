@@ -1,4 +1,4 @@
-package crdt
+package state
 
 import "kvs/util"
 
@@ -69,8 +69,8 @@ func (g *GCounter) Compare(o GCounter) Ord {
 }
 
 func (g *GCounter) Merge(o GCounter) {
-	for k, va := range g.vec {
-		vb := o.SafeGet(k)
-		g.vec[k] = util.Max(va, vb)
+	for k, vo := range o.vec {
+		v := g.SafeGet(k)
+		g.vec[k] = util.Max(v, vo)
 	}
 }
