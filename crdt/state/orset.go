@@ -100,13 +100,10 @@ func (s *SORSet) Merge(o SORSet) {
 	}
 
 	for _, mu := range U {
-		mu.ForEach(func(m1 metadata) {
-			if mu.Exists(func(m2 metadata) bool {
+		mu.RemoveWhere(func(m1 metadata) bool {
+			return mu.Exists(func(m2 metadata) bool {
 				return m1.replica == m2.replica && m2.timestamp > m1.timestamp
-			}) {
-				// m1 is outdated: remove
-				mu.Delete(m1)
-			}
+			})
 		})
 	}
 	s.set = U
