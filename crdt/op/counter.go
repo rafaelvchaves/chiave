@@ -4,14 +4,16 @@ import "kvs/crdt"
 
 type Counter struct {
 	id      string
+	key     string
 	c       int
 	current crdt.Event
 }
 
-func NewCounter(id string) *Counter {
+func NewCounter(id string, key string) *Counter {
 	return &Counter{
-		id: id,
-		c:  0,
+		id:  id,
+		key: key,
+		c:   0,
 		current: crdt.Event{
 			Source: id,
 		},
@@ -42,7 +44,12 @@ func (c *Counter) GetEvent() crdt.Event {
 	return current
 }
 
-func (c *Counter) PersistEvent(event crdt.Event) {
-	update, _ := event.Data.(int)
-	c.c += update
+func (c *Counter) PersistEvents(events []crdt.Event) {
+	for _, e := range events {
+		update, ok := e.Data.(int)
+		if !ok {
+			continue
+		}
+		c.c += update
+	}
 }

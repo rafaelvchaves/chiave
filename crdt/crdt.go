@@ -1,22 +1,21 @@
 package crdt
 
 type Event struct {
-	Source string // id of source replica
-	Data   any    // CvRDT: state, CmRDT: update, dCvRDT: delta
+	Source string
+	Key string
+	Data   any
 }
 
 type CRDT interface {
 	GetEvent() Event
-	PersistEvent(Event)
+	PersistEvents([]Event)
 }
 
 // Counters
 type Counter interface {
 	CRDT
 	Value() int
-
 	Increment()
-
 	Decrement()
 }
 

@@ -39,8 +39,8 @@ func main() {
 	// c1 := op.NewCounter("c1")
 	// c2 := op.NewCounter("c2")
 
-	c1 := state.NewCounter("c1")
-	c2 := state.NewCounter("c2")
+	c1 := state.NewCounter("c1", "key1")
+	c2 := state.NewCounter("c2", "key1")
 	m1 := map[string]crdt.CRDT{
 		"key1": c1,
 	}
@@ -59,8 +59,8 @@ func main() {
 	c2.Decrement()
 	e2 := c2.GetEvent()
 
-	c1.PersistEvent(e2)
-	c2.PersistEvent(e1)
+	c1.PersistEvents([]crdt.Event{e2})
+	c2.PersistEvents([]crdt.Event{e1})
 
 	Put(m1, "key1", c1)
 	Put(m2, "key1", c2)

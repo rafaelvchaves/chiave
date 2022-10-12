@@ -4,13 +4,15 @@ import "kvs/crdt"
 
 type Counter struct {
 	id  string
+	key string
 	pos GCounter
 	neg GCounter
 }
 
-func NewCounter(id string) *Counter {
+func NewCounter(id string, key string) *Counter {
 	return &Counter{
 		id:  id,
+		key: key,
 		pos: NewGCounter(id),
 		neg: NewGCounter(id),
 	}
@@ -40,6 +42,8 @@ func (c *Counter) GetEvent() crdt.Event {
 	}
 }
 
-func (s *Counter) PersistEvent(event crdt.Event) {
-	s.Merge(event.Data.(Counter))
+func (s *Counter) PersistEvents(events []crdt.Event) {
+	for _, e := range events {
+		s.Merge(e.Data.(Counter))
+	}
 }
