@@ -1,0 +1,24 @@
+syntax = "proto3";
+
+package chiave;
+
+service Chiave {
+  rpc Value(Key) returns (ValueResponse) {}
+  rpc Increment(Key) returns (Success) {}
+  rpc Decrement(Key) returns (Success) {}
+  rpc Delete(Key) returns (Success) {}
+}
+
+message Key {
+  string id = 1;
+}
+
+message ValueResponse {
+  int64 value = 1;
+  bool exists = 2;
+}
+
+message Success {
+  bool success = 1;
+  string message = 2;
+}
