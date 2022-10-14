@@ -3,6 +3,7 @@ package client
 import (
 	"context"
 	"fmt"
+	"kvs/crdt"
 	pb "kvs/proto"
 	"math/rand"
 	"time"
@@ -19,28 +20,20 @@ func (hasher) Sum64(data []byte) uint64 {
 	return farmhash.Hash64(data)
 }
 
-type replica struct {
-	addr     string
-	workerID int
+type Replica struct {
+	Addr     string
+	WorkerID int
 }
 
-func NewReplica(addr string, workerID int) replica {
-	return replica{
-		addr:     addr,
-		workerID: workerID,
+func NewReplica(addr string, workerID int) Replica {
+	return Replica{
+		Addr:     addr,
+		WorkerID: workerID,
 	}
 }
 
-func (r replica) String() string {
-	return r.addr + "," + fmt.Sprintf("%d", r.workerID)
-}
-
-func (r replica) Addr() string {
-	return r.addr
-}
-
-func (r replica) WorkerID() int {
-	return r.workerID
+func (r Replica) String() string {
+	return r.Addr + "," + fmt.Sprintf("%d", r.WorkerID)
 }
 
 type Proxy struct {
@@ -49,9 +42,7 @@ type Proxy struct {
 	repFactor   int
 }
 
-func NewProxy() *Proxy {
-	repFactor := 3
-	threadsPerServer := 5
+func NewProxy(repFactor, threadsPerServer int, flavor crdt.Flavor) *Proxy {
 	serverAddrs := []string{
 		"localhost:4747",
 	}
@@ -80,16 +71,7 @@ func NewProxy() *Proxy {
 	return p
 }
 
-func (p *Proxy) Cleanup() error {
-	for _, conn := range p.connections {
-		if err := conn.Close(); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (p *Proxy) clientOfOwner(key string) (pb.ChiaveClient, error) {
+func (p *Proxy) chooseLeader(key string) (pb.ChiaveClient, error) {
 	owners, err := p.hashRing.GetClosestN([]byte(key), p.repFactor)
 	if err != nil {
 		return nil, err
@@ -98,7 +80,7 @@ func (p *Proxy) clientOfOwner(key string) (pb.ChiaveClient, error) {
 	rand.Seed(time.Now().UnixNano())
 	rand.Shuffle(len(owners), func(i, j int) { owners[i], owners[j] = owners[j], owners[i] })
 	for _, owner := range owners {
-		addr := owner.(replica).Addr()
+		addr := owner.(Replica).Addr
 		conn, ok := p.connections[addr]
 		if !ok {
 			continue
@@ -109,13 +91,13 @@ func (p *Proxy) clientOfOwner(key string) (pb.ChiaveClient, error) {
 }
 
 func (p *Proxy) Increment(key string) error {
-	client, err := p.clientOfOwner(key)
+	leader, err := p.chooseLeader(key)
 	if err != nil {
 		return err
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	_, err = client.Increment(ctx, &pb.Key{Id: key})
+	_, err = leader.Increment(ctx, &pb.Key{Id: key})
 	if err != nil {
 		return err
 	}
@@ -123,13 +105,13 @@ func (p *Proxy) Increment(key string) error {
 }
 
 func (p *Proxy) Decrement(key string) error {
-	client, err := p.clientOfOwner(key)
+	leader, err := p.chooseLeader(key)
 	if err != nil {
 		return err
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	_, err = client.Decrement(ctx, &pb.Key{Id: key})
+	_, err = leader.Decrement(ctx, &pb.Key{Id: key})
 	if err != nil {
 		return err
 	}
@@ -137,15 +119,24 @@ func (p *Proxy) Decrement(key string) error {
 }
 
 func (p *Proxy) Value(key string) (int64, error) {
-	client, err := p.clientOfOwner(key)
+	leader, err := p.chooseLeader(key)
 	if err != nil {
 		return 0, err
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	r, err := client.Value(ctx, &pb.Key{Id: key})
+	r, err := leader.Value(ctx, &pb.Key{Id: key})
 	if err != nil {
 		return 0, err
 	}
 	return r.Value, nil
+}
+
+func (p *Proxy) Cleanup() error {
+	for _, conn := range p.connections {
+		if err := conn.Close(); err != nil {
+			return err
+		}
+	}
+	return nil
 }

@@ -1,8 +1,16 @@
 package crdt
 
+type Flavor int
+
+const (
+	Op Flavor = iota
+	State
+	Delta
+)
+
 type Event struct {
 	Source string
-	Key string
+	Key    string
 	Data   any
 }
 

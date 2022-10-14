@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	pb "kvs/proto"
 	"kvs/replica"
 	"net"
@@ -13,78 +12,85 @@ import (
 
 type Leader struct {
 	pb.UnimplementedChiaveServer
-	addr string
+	addr    string
 	workers []replica.Worker
 }
 
 func NewLeader() *Leader {
-	addr := "localhost:4747"
-	workersPerReplica := 5
+	addr := "localhost:4747" // TODO: read from config
+	workersPerReplica := 5 // TODO: read from config
 	workers := make([]replica.Worker, workersPerReplica)
 	for i := 0; i < workersPerReplica; i++ {
 		workers[i] = replica.NewWorker(addr, i, replica.NewCache())
 	}
 	return &Leader{
-		addr: addr,
+		addr:    addr,
 		workers: workers,
 	}
 }
 
+func (l *Leader) StartWorkers() {
+	for _, w := range l.workers {
+		go w.Start()
+	}
+}
+
 func (l *Leader) Value(ctx context.Context, in *pb.Key) (*pb.ValueResponse, error) {
-	fmt.Println("Value")
-	return nil, nil
+	return &pb.ValueResponse{}, nil
 }
 
 func (l *Leader) Increment(ctx context.Context, in *pb.Key) (*emptypb.Empty, error) {
-	fmt.Println("Increment")
-	return nil, nil
+	req := replica.ClientRequest{
+		Key:       in.Id,
+		Operation: replica.Increment,
+	}
+	l.workers[in.WorkerId].AddRequest(req)
+	return &emptypb.Empty{}, nil
 }
 
 func (l *Leader) Decrement(ctx context.Context, in *pb.Key) (*emptypb.Empty, error) {
-	fmt.Println("Decrement")
-	return nil, nil
+	req := replica.ClientRequest{
+		Key:       in.Id,
+		Operation: replica.Decrement,
+	}
+	l.workers[in.WorkerId].AddRequest(req)
+	return &emptypb.Empty{}, nil
 }
 
 func main() {
-	// addr, err := getAddress()
-	// if err != nil {
-	// 	fmt.Println("cannot get IP address")
-	// 	return
-	// }
+	leader := NewLeader()
+	leader.StartWorkers()
 	addr := "localhost:4747"
-	fmt.Println(fmt.Sprintf("listening at address %s...", addr))
 	listener, err := net.Listen("tcp", addr)
 	if err != nil {
-		fmt.Println(err)
 		return
 	}
-	leader := NewLeader()
-	grpcServer := grpc.NewServer()
-	pb.RegisterChiaveServer(grpcServer, leader)
-	grpcServer.Serve(listener)
+	server := grpc.NewServer()
+	pb.RegisterChiaveServer(server, leader)
+	server.Serve(listener)
 }
 
-func getAddress() (string, error) {
-	ip, err := getHost()
-	port := "4747"
-	if err != nil {
-		return "", err
-	}
-	addr := net.JoinHostPort(ip, port)
-	return addr, nil
-}
+// func getAddress() (string, error) {
+// 	ip, err := getHost()
+// 	port := "4747"
+// 	if err != nil {
+// 		return "", err
+// 	}
+// 	addr := net.JoinHostPort(ip, port)
+// 	return addr, nil
+// }
 
-func getHost() (string, error) {
-	addrs, err := net.InterfaceAddrs()
-	if err != nil {
-		return "", fmt.Errorf("could not get interface addresses")
-	}
-	for _, address := range addrs {
-		if ipnet, ok := address.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
-			if ipnet.IP.To4() != nil {
-				return ipnet.IP.String(), nil
-			}
-		}
-	}
-	return "", fmt.Errorf("cannot find IP")
-}
+// func getHost() (string, error) {
+// 	addrs, err := net.InterfaceAddrs()
+// 	if err != nil {
+// 		return "", fmt.Errorf("could not get interface addresses")
+// 	}
+// 	for _, address := range addrs {
+// 		if ipnet, ok := address.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
+// 			if ipnet.IP.To4() != nil {
+// 				return ipnet.IP.String(), nil
+// 			}
+// 		}
+// 	}
+// 	return "", fmt.Errorf("cannot find IP")
+// }

@@ -40,6 +40,7 @@ func (c *Counter) GetEvent() crdt.Event {
 	current := c.current
 	c.current = crdt.Event{
 		Source: c.id,
+		Data: 0,
 	}
 	return current
 }
