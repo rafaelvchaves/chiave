@@ -1,12 +1,17 @@
 syntax = "proto3";
 
+import "google/protobuf/empty.proto";
+
+option go_package = "kvs/proto/chiave";
+
 package chiave;
 
 service Chiave {
   rpc Value(Key) returns (ValueResponse) {}
-  rpc Increment(Key) returns (Success) {}
-  rpc Decrement(Key) returns (Success) {}
-  rpc Delete(Key) returns (Success) {}
+  rpc Increment(Key) returns (google.protobuf.Empty) {}
+  rpc Decrement(Key) returns (google.protobuf.Empty) {}
+
+  // rpc Delete(Key) returns (Success) {}
 }
 
 message Key {
@@ -16,9 +21,4 @@ message Key {
 message ValueResponse {
   int64 value = 1;
   bool exists = 2;
-}
-
-message Success {
-  bool success = 1;
-  string message = 2;
 }
