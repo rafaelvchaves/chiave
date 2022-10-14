@@ -17,6 +17,14 @@ func (c *Cache) Get(key string) (crdt.CRDT, bool) {
 	return v, ok
 }
 
+func (c *Cache) GetOrDefault(key string, def crdt.CRDT) crdt.CRDT {
+	v, ok := c.cache[key]
+	if !ok {
+		return def
+	}
+	return v
+}
+
 func (c *Cache) Put(key string, value crdt.CRDT) {
 	c.cache[key] = value
 }
