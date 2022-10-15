@@ -2,8 +2,8 @@ package replica
 
 import "kvs/crdt"
 
-type Store interface {
-	Get(string) (crdt.CRDT, bool)
-	GetOrDefault(string, crdt.CRDT) crdt.CRDT
-	Put(string, crdt.CRDT)
+type Store[F crdt.Flavor] interface {
+	Get(string) (crdt.CRDT[F], bool)
+	GetOrDefault(string, crdt.CRDT[F]) crdt.CRDT[F]
+	Put(string, crdt.CRDT[F])
 }

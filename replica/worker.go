@@ -1,17 +1,18 @@
 package replica
 
 import (
-	"fmt"
 	"kvs/crdt"
+	"kvs/data"
+	"kvs/util"
 	"time"
 )
 
-type Worker struct {
-	addr       string
-	workerID int
-	kvs      Store
-	requests chan ClientRequest
-	events   chan crdt.Event
+type Worker[F crdt.Flavor] struct {
+	replica   util.Replica
+	generator crdt.Generator[F]
+	kvs       Store[F]
+	requests  chan ClientRequest
+	events    chan crdt.Event[F]
 }
 
 type Operation int
@@ -19,7 +20,6 @@ type Operation int
 const (
 	Increment Operation = iota
 	Decrement
-	Value
 )
 
 type ClientRequest struct {
@@ -28,70 +28,80 @@ type ClientRequest struct {
 	Params    any
 }
 
-func NewWorker(addr string, workerID int, kvs Store) Worker {
-	return Worker{
-		addr:       addr,
-		workerID: workerID,
-		kvs:      kvs,
-		requests: make(chan ClientRequest),
-		events:   make(chan crdt.Event),
+func NewWorker[F crdt.Flavor](replica util.Replica, kvs Store[F], generator crdt.Generator[F]) Worker[F] {
+	return Worker[F]{
+		generator: generator,
+		replica:   replica,
+		kvs:       kvs,
+		requests:  make(chan ClientRequest),
+		events:    make(chan crdt.Event[F]),
 	}
 }
 
-func (w *Worker) Start() {
+func (w *Worker[F]) Start() {
 	requestDeadline := 100 * time.Millisecond
 	for {
-		// events := make(map[string]crdt.Event)
-
+		var changeset data.Set[string] // set of keys modified in this epoch
 		// phase 1: receive client requests and convert to events
 		select {
 		case req := <-w.requests:
-			fmt.Println(req)
-		// event := parse(req)
-		// Events = // add to events map
+			w.process(req)
+			changeset.Add(req.Key)
 		case <-time.After(requestDeadline):
 			break
 		}
-		// for key, e := range events {
-		// 	crdt, ok := w.kvs.Get(key)
-		// 	if !ok {
 
-		// 	}
-		// 	// crdt.PersistEvents()
-		// 	// w.broadcast(key, e)
-		// }
+		// phase 2: go through all affected keys and broadcast to other owners
+		changeset.Range(func(key string) bool {
+			v, ok := w.kvs.Get(key)
+			if !ok {
+				return false
+			}
+			w.broadcast(v.GetEvent())
+			return true
+		})
+
+		// phase 3: drain event queue and persist all events
+		for event := range w.events {
+			v := w.kvs.GetOrDefault(event.Key, w.generator.New(event.Type, w.replica))
+			v.PersistEvent(event)
+		}
 	}
 }
 
-func (w *Worker) Act(r ClientRequest) {
-	v, exists := w.kvs.Get(r.Key)
+func (w *Worker[F]) process(r ClientRequest) {
 	switch r.Operation {
 	case Increment:
-		if !exists {
-			// v = op.NewCounter()
-		}
+		v := w.kvs.GetOrDefault(r.Key, w.generator.New(crdt.CType, w.replica))
 		counter, ok := v.(crdt.Counter)
 		if !ok {
-
+			return
 		}
 		counter.Increment()
+		w.kvs.Put(r.Key, v)
+	case Decrement:
+		v := w.kvs.GetOrDefault(r.Key, w.generator.New(crdt.CType, w.replica))
+		counter, ok := v.(crdt.Counter)
+		if !ok {
+			return
+		}
+		counter.Decrement()
+		w.kvs.Put(r.Key, v)
 	}
 }
 
-func (w *Worker) Broadcast(key string, event crdt.Event) {
-	// // map[key]ips
-	// 	ips := w.localMap[key]
-	// 	For ip := range ips {
-	// 		If ip == LOCAL {
-	// }
-	// // send RPC to machine
-	// }
+func (w *Worker[F]) broadcast(event crdt.Event[F]) {
+	// TODO:
+	// (1): hash event.Key to get address of leader(s)
+	// (2): for each leader, send an RPC (ProcessEvent?)
+	// (3): on leader side, processEvent implementation should simply
+	// invoke the PutEvent() method on the proper worker.
 }
 
-func (w *Worker) AddRequest(r ClientRequest) {
+func (w *Worker[_]) PutRequest(r ClientRequest) {
 	w.requests <- r
 }
 
-func (w *Worker) AddEvent(e crdt.Event) {
+func (w *Worker[F]) PutEvent(e crdt.Event[F]) {
 	w.events <- e
 }

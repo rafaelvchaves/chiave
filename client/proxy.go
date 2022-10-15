@@ -3,8 +3,8 @@ package client
 import (
 	"context"
 	"fmt"
-	"kvs/crdt"
 	pb "kvs/proto"
+	"kvs/util"
 	"math/rand"
 	"time"
 
@@ -20,29 +20,13 @@ func (hasher) Sum64(data []byte) uint64 {
 	return farmhash.Hash64(data)
 }
 
-type Replica struct {
-	Addr     string
-	WorkerID int
-}
-
-func NewReplica(addr string, workerID int) Replica {
-	return Replica{
-		Addr:     addr,
-		WorkerID: workerID,
-	}
-}
-
-func (r Replica) String() string {
-	return r.Addr + "," + fmt.Sprintf("%d", r.WorkerID)
-}
-
 type Proxy struct {
 	connections map[string]*grpc.ClientConn
 	hashRing    *consistent.Consistent
 	repFactor   int
 }
 
-func NewProxy(repFactor, threadsPerServer int, flavor crdt.Flavor) *Proxy {
+func NewProxy(repFactor, threadsPerServer int) *Proxy {
 	serverAddrs := []string{
 		"localhost:4747",
 	}
@@ -65,7 +49,7 @@ func NewProxy(repFactor, threadsPerServer int, flavor crdt.Flavor) *Proxy {
 		}
 		p.connections[addr] = conn
 		for k := 0; k < threadsPerServer; k++ {
-			p.hashRing.Add(NewReplica(addr, k))
+			p.hashRing.Add(util.NewReplica(addr, k))
 		}
 	}
 	return p
@@ -80,7 +64,7 @@ func (p *Proxy) chooseLeader(key string) (pb.ChiaveClient, error) {
 	rand.Seed(time.Now().UnixNano())
 	rand.Shuffle(len(owners), func(i, j int) { owners[i], owners[j] = owners[j], owners[i] })
 	for _, owner := range owners {
-		addr := owner.(Replica).Addr
+		addr := owner.(util.Replica).Addr
 		conn, ok := p.connections[addr]
 		if !ok {
 			continue
