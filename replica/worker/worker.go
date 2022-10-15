@@ -2,7 +2,6 @@ package worker
 
 import (
 	"kvs/crdt"
-	"kvs/data"
 	"kvs/util"
 	"time"
 )
@@ -42,8 +41,9 @@ func (w *Worker[F]) Start() {
 	requestDeadline := 100 * time.Millisecond
 	for {
 		// set of keys modified in this epoch
-		var changeset data.Set[string]
-		reqLoop: for {
+		var changeset util.Set[string]
+	reqLoop:
+		for {
 			// phase 1: receive client requests and convert to events
 			select {
 			case req := <-w.requests:

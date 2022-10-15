@@ -2,7 +2,6 @@ package state
 
 import (
 	"kvs/crdt"
-	"kvs/data"
 	"kvs/util"
 )
 
@@ -13,14 +12,14 @@ type metadata struct {
 
 type Set struct {
 	replica util.Replica
-	set     map[string]data.Set[metadata]
+	set     map[string]util.Set[metadata]
 	vclock  GCounter
 }
 
 func NewSet(replica util.Replica) *Set {
 	return &Set{
 		replica: replica,
-		set:     make(map[string]data.Set[metadata]),
+		set:     make(map[string]util.Set[metadata]),
 		vclock:  NewGCounter(replica),
 	}
 }
@@ -39,7 +38,7 @@ func (s *Set) Add(e string) {
 	}
 	mds, ok := s.set[e]
 	if !ok {
-		s.set[e] = data.NewSet(md)
+		s.set[e] = util.NewSet(md)
 		return
 	}
 	mds.RemoveWhere(func(md metadata) bool {
@@ -52,15 +51,15 @@ func (s *Set) Remove(e string) {
 	delete(s.set, e)
 }
 
-func union(a, b map[string]data.Set[metadata]) map[string]data.Set[metadata] {
-	m := make(map[string]data.Set[metadata])
+func union(a, b map[string]util.Set[metadata]) map[string]util.Set[metadata] {
+	m := make(map[string]util.Set[metadata])
 	for e, mdsa := range a {
 		mdsb, ok := b[e]
 		if !ok {
 			m[e] = mdsa
 			continue
 		}
-		m[e] = data.Union(mdsa, mdsb)
+		m[e] = util.Union(mdsa, mdsb)
 	}
 	for e, mdsb := range b {
 		if _, ok := m[e]; !ok {
@@ -70,17 +69,17 @@ func union(a, b map[string]data.Set[metadata]) map[string]data.Set[metadata] {
 	return m
 }
 
-func addSafe(m map[string]data.Set[metadata], e string, md metadata) {
+func addSafe(m map[string]util.Set[metadata], e string, md metadata) {
 	old, ok := m[e]
 	if !ok {
-		m[e] = data.NewSet(md)
+		m[e] = util.NewSet(md)
 		return
 	}
 	old.Add(md)
 }
 
 func (s *Set) Merge(o Set) {
-	U := make(map[string]data.Set[metadata])
+	U := make(map[string]util.Set[metadata])
 	for e, ma := range s.set {
 		ma.ForEach(func(m metadata) {
 			mb, ok := o.set[e]

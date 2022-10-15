@@ -2,7 +2,6 @@ package op
 
 import (
 	"kvs/crdt"
-	"kvs/data"
 	"kvs/util"
 )
 
@@ -14,8 +13,8 @@ import (
 // )
 
 type Graph struct {
-	vertices data.Set[taggedVertex]
-	edges    data.Set[taggedEdge]
+	vertices util.Set[taggedVertex]
+	edges    util.Set[taggedEdge]
 }
 
 type Vertex = crdt.Vertex
@@ -38,8 +37,8 @@ type taggedEdge = util.Pair[Edge, tag]
 
 func NewGraph(r util.Replica) *Graph {
 	return &Graph{
-		vertices: data.NewSet[taggedVertex](),
-		edges:    data.NewSet[taggedEdge](),
+		vertices: util.NewSet[taggedVertex](),
+		edges:    util.NewSet[taggedEdge](),
 	}
 }
 

@@ -2,19 +2,18 @@ package op
 
 import (
 	"kvs/crdt"
-	"kvs/data"
 	"kvs/util"
 )
 
 type Set struct {
 	replica util.Replica
-	s       data.Set[util.Pair[string, tag]]
+	s       util.Set[util.Pair[string, tag]]
 }
 
 func NewSet(r util.Replica) *Set {
 	return &Set{
 		replica: r,
-		s:       data.NewSet[util.Pair[string, tag]](),
+		s:       util.NewSet[util.Pair[string, tag]](),
 	}
 }
 
