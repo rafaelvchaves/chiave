@@ -83,6 +83,14 @@ func (s *Set[T]) ForEach(f func(T)) {
 	}
 }
 
+func (s *Set[T]) Range(f func(T) bool) {
+	for k := range s.s {
+		if !f(k) {
+			return
+		}
+	}
+}
+
 func (s *Set[T]) RemoveWhere(f func(T) bool) {
 	for k := range s.s {
 		if f(k) {
