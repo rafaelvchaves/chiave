@@ -7,7 +7,7 @@ import (
 	"kvs/crdt/op"
 	"kvs/crdt/state"
 	pb "kvs/proto"
-	"kvs/replica"
+	"kvs/replica/worker"
 	"kvs/util"
 	"net"
 
@@ -27,7 +27,7 @@ type leader[F crdt.Flavor] struct {
 	pb.UnimplementedChiaveServer
 	flavor  crdt.Flavor
 	addr    string
-	workers []replica.Worker[F]
+	workers []worker.Worker[F]
 }
 
 type Leader interface {
@@ -49,10 +49,10 @@ func NewLeader(opt CRDTOption) Leader {
 func LeaderWithFlavor[F crdt.Flavor](g crdt.Generator[F]) *leader[F] {
 	addr := "localhost:4747" // TODO: read from config
 	workersPerReplica := 5   // TODO: read from config
-	workers := make([]replica.Worker[F], workersPerReplica)
+	workers := make([]worker.Worker[F], workersPerReplica)
 	for i := 0; i < workersPerReplica; i++ {
 		r := util.NewReplica(addr, i)
-		workers[i] = replica.NewWorker(r, replica.NewCache[F](), g)
+		workers[i] = worker.New(r, worker.NewCache[F](), g)
 	}
 	return &leader[F]{
 		addr:    addr,
@@ -71,18 +71,18 @@ func (l *leader[_]) Value(ctx context.Context, in *pb.Key) (*pb.ValueResponse, e
 }
 
 func (l *leader[_]) Increment(ctx context.Context, in *pb.Key) (*emptypb.Empty, error) {
-	req := replica.ClientRequest{
+	req := worker.ClientRequest{
 		Key:       in.Id,
-		Operation: replica.Increment,
+		Operation: worker.Increment,
 	}
 	l.workers[in.WorkerId].PutRequest(req)
 	return &emptypb.Empty{}, nil
 }
 
 func (l *leader[_]) Decrement(ctx context.Context, in *pb.Key) (*emptypb.Empty, error) {
-	req := replica.ClientRequest{
+	req := worker.ClientRequest{
 		Key:       in.Id,
-		Operation: replica.Decrement,
+		Operation: worker.Decrement,
 	}
 	l.workers[in.WorkerId].PutRequest(req)
 	return &emptypb.Empty{}, nil

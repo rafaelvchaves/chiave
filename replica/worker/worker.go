@@ -1,4 +1,4 @@
-package replica
+package worker
 
 import (
 	"kvs/crdt"
@@ -28,7 +28,7 @@ type ClientRequest struct {
 	Params    any
 }
 
-func NewWorker[F crdt.Flavor](replica util.Replica, kvs Store[F], generator crdt.Generator[F]) Worker[F] {
+func New[F crdt.Flavor](replica util.Replica, kvs Store[F], generator crdt.Generator[F]) Worker[F] {
 	return Worker[F]{
 		generator: generator,
 		replica:   replica,
@@ -41,14 +41,17 @@ func NewWorker[F crdt.Flavor](replica util.Replica, kvs Store[F], generator crdt
 func (w *Worker[F]) Start() {
 	requestDeadline := 100 * time.Millisecond
 	for {
-		var changeset data.Set[string] // set of keys modified in this epoch
-		// phase 1: receive client requests and convert to events
-		select {
-		case req := <-w.requests:
-			w.process(req)
-			changeset.Add(req.Key)
-		case <-time.After(requestDeadline):
-			break
+		// set of keys modified in this epoch
+		var changeset data.Set[string]
+		reqLoop: for {
+			// phase 1: receive client requests and convert to events
+			select {
+			case req := <-w.requests:
+				w.process(req)
+				changeset.Add(req.Key)
+			case <-time.After(requestDeadline):
+				break reqLoop
+			}
 		}
 
 		// phase 2: go through all affected keys and broadcast to other owners

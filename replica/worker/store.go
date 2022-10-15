@@ -1,4 +1,4 @@
-package replica
+package worker
 
 import "kvs/crdt"
 
