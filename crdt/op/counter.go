@@ -1,21 +1,23 @@
 package op
 
-import "kvs/crdt"
+import (
+	"kvs/crdt"
+	"kvs/util"
+)
 
 type Counter struct {
-	id      string
+	replica util.Replica
 	key     string
 	c       int
-	current crdt.Event
+	current crdt.Event[CRDT]
 }
 
-func NewCounter(id string, key string) *Counter {
+func NewCounter(replica util.Replica) *Counter {
 	return &Counter{
-		id:  id,
-		key: key,
-		c:   0,
-		current: crdt.Event{
-			Source: id,
+		replica: replica,
+		c:       0,
+		current: crdt.Event[CRDT]{
+			Source: replica,
 		},
 	}
 }
@@ -36,21 +38,19 @@ func (c *Counter) Decrement() {
 	c.current.Data = update - 1
 }
 
-func (c *Counter) GetEvent() crdt.Event {
+func (c *Counter) GetEvent() crdt.Event[CRDT] {
 	current := c.current
-	c.current = crdt.Event{
-		Source: c.id,
-		Data: 0,
+	c.current = crdt.Event[CRDT]{
+		Source: c.replica,
+		Data:   0,
 	}
 	return current
 }
 
-func (c *Counter) PersistEvents(events []crdt.Event) {
-	for _, e := range events {
-		update, ok := e.Data.(int)
-		if !ok {
-			continue
-		}
-		c.c += update
+func (c *Counter) PersistEvent(event crdt.Event[CRDT]) {
+	update, ok := event.Data.(int)
+	if !ok {
+		return
 	}
+	c.c += update
 }

@@ -1,5 +1,11 @@
 package op
 
+import (
+	"kvs/crdt"
+	"kvs/data"
+	"kvs/util"
+)
+
 // import (
 // 	"kvs/crdt"
 // 	"kvs/data"
@@ -7,20 +13,20 @@ package op
 // 	"github.com/google/uuid"
 // )
 
-// type OGraph struct {
-// 	vertices data.Set[taggedVertex]
-// 	edges    data.Set[taggedEdge]
-// }
+type Graph struct {
+	vertices data.Set[taggedVertex]
+	edges    data.Set[taggedEdge]
+}
 
-// type Vertex = crdt.Vertex
+type Vertex = crdt.Vertex
 
-// type Edge = crdt.Edge
+type Edge = crdt.Edge
 
 type tag = string
 
-// type taggedVertex = data.Pair[Vertex, tag]
+type taggedVertex = util.Pair[Vertex, tag]
 
-// type taggedEdge = data.Pair[Edge, tag]
+type taggedEdge = util.Pair[Edge, tag]
 
 // func EqualsVertex(v Vertex) func(taggedVertex) bool {
 // 	return func(p taggedVertex) bool { return p.First == v }
@@ -30,12 +36,21 @@ type tag = string
 // 	return func(p taggedEdge) bool { return p.First == e }
 // }
 
-// func NewGraph() *OGraph {
-// 	return &OGraph{
-// 		vertices: data.NewSet[taggedVertex](),
-// 		edges:    data.NewSet[taggedEdge](),
-// 	}
-// }
+func NewGraph(r util.Replica) *Graph {
+	return &Graph{
+		vertices: data.NewSet[taggedVertex](),
+		edges:    data.NewSet[taggedEdge](),
+	}
+}
+
+func (g *Graph) AddVertex(v crdt.Vertex)             {}
+func (g *Graph) RemoveVertex(v crdt.Vertex)          {}
+func (g *Graph) AddEdge(e crdt.Edge)                 {}
+func (g *Graph) RemoveEdge(e crdt.Edge)              {}
+func (g *Graph) LookupEdge(e crdt.Edge) bool         { return false }
+func (g *Graph) LookupVertex(v crdt.Vertex) bool     { return false }
+func (g *Graph) GetEvent() crdt.Event[CRDT]          { return crdt.Event[CRDT]{} }
+func (g *Graph) PersistEvent(event crdt.Event[CRDT]) {}
 
 // func (g *OGraph) LookupVertex(v Vertex) bool {
 // 	ok := g.vertices.Exists(EqualsVertex(v))

@@ -12,26 +12,27 @@ const (
 )
 
 type GCounter struct {
-	id  string
-	vec map[string]int
+	replica util.Replica
+	vec     map[string]int
 }
 
-func NewGCounter(id string) GCounter {
+func NewGCounter(replica util.Replica) GCounter {
 	vec := make(map[string]int)
-	vec[id] = 0
+	vec[replica.String()] = 0
 	return GCounter{
-		id:  id,
-		vec: vec,
+		replica: replica,
+		vec:     vec,
 	}
 }
 
 func (g *GCounter) Increment() {
-	v, ok := g.vec[g.id]
+	id := g.replica.String()
+	v, ok := g.vec[id]
 	if !ok {
-		g.vec[g.id] = 1
+		g.vec[id] = 1
 		return
 	}
-	g.vec[g.id] = v + 1
+	g.vec[id] = v + 1
 }
 
 func (g *GCounter) Value() int {

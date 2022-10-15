@@ -1,20 +1,21 @@
 package state
 
-import "kvs/crdt"
+import (
+	"kvs/crdt"
+	"kvs/util"
+)
 
 type Counter struct {
-	id  string
-	key string
-	pos GCounter
-	neg GCounter
+	replica util.Replica
+	pos     GCounter
+	neg     GCounter
 }
 
-func NewCounter(id string, key string) *Counter {
+func NewCounter(replica util.Replica) *Counter {
 	return &Counter{
-		id:  id,
-		key: key,
-		pos: NewGCounter(id),
-		neg: NewGCounter(id),
+		replica: replica,
+		pos:     NewGCounter(replica),
+		neg:     NewGCounter(replica),
 	}
 }
 
@@ -35,15 +36,17 @@ func (c *Counter) Merge(o Counter) {
 	c.neg.Merge(o.neg)
 }
 
-func (c *Counter) GetEvent() crdt.Event {
-	return crdt.Event{
-		Source: c.id,
+func (c *Counter) GetEvent() crdt.Event[CRDT] {
+	return crdt.Event[CRDT]{
+		Source: c.replica,
 		Data:   *c,
 	}
 }
 
-func (s *Counter) PersistEvents(events []crdt.Event) {
-	for _, e := range events {
-		s.Merge(e.Data.(Counter))
+func (s *Counter) PersistEvent(event crdt.Event[CRDT]) {
+	c, ok := event.Data.(Counter)
+	if !ok {
+		return
 	}
+	s.Merge(c)
 }

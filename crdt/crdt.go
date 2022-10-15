@@ -1,27 +1,37 @@
 package crdt
 
-type Flavor int
-
-const (
-	Op Flavor = iota
-	State
-	Delta
+import (
+	"kvs/util"
 )
 
-type Event struct {
-	Source string
+type Generator[F Flavor] interface {
+	New(DataType, util.Replica) CRDT[F]
+}
+
+type DataType int
+
+const (
+	CType DataType = iota
+	SType
+	GType
+)
+
+type Flavor any
+
+type Event[F Flavor] struct {
+	Source util.Replica
+	Type   DataType
 	Key    string
 	Data   any
 }
 
-type CRDT interface {
-	GetEvent() Event
-	PersistEvents([]Event)
+type CRDT[F Flavor] interface {
+	GetEvent() Event[F]
+	PersistEvent(Event[F])
 }
 
 // Counters
 type Counter interface {
-	CRDT
 	Value() int
 	Increment()
 	Decrement()
@@ -29,7 +39,6 @@ type Counter interface {
 
 // Sets
 type Set interface {
-	CRDT
 	Lookup(string) bool
 	Add(string)
 	Remove(string)
@@ -43,7 +52,6 @@ type Edge struct {
 }
 
 type Graph interface {
-	CRDT
 	AddVertex(v Vertex)
 	RemoveVertex(v Vertex)
 	AddEdge(e Edge)

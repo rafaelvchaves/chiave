@@ -1,7 +1,9 @@
 package state
 
 import (
+	"kvs/crdt"
 	"kvs/data"
+	"kvs/util"
 )
 
 type metadata struct {
@@ -9,31 +11,31 @@ type metadata struct {
 	replica   string
 }
 
-type SORSet struct {
-	id     string
-	set    map[string]data.Set[metadata]
-	vclock GCounter
+type Set struct {
+	replica util.Replica
+	set     map[string]data.Set[metadata]
+	vclock  GCounter
 }
 
-func NewStateORSet(id string) SORSet {
-	return SORSet{
-		id:     id,
-		set:    make(map[string]data.Set[metadata]),
-		vclock: NewGCounter(id),
+func NewSet(replica util.Replica) *Set {
+	return &Set{
+		replica: replica,
+		set:     make(map[string]data.Set[metadata]),
+		vclock:  NewGCounter(replica),
 	}
 }
 
-func (s *SORSet) Lookup(e string) bool {
+func (s *Set) Lookup(e string) bool {
 	_, ok := s.set[e]
 	return ok
 }
 
-func (s *SORSet) Add(e string) {
+func (s *Set) Add(e string) {
 	c := s.vclock.Value() + 1
 	s.vclock.Increment()
 	md := metadata{
 		timestamp: c,
-		replica:   s.id,
+		replica:   s.replica.String(),
 	}
 	mds, ok := s.set[e]
 	if !ok {
@@ -46,7 +48,7 @@ func (s *SORSet) Add(e string) {
 	mds.Add(md)
 }
 
-func (s *SORSet) Remove(e string) {
+func (s *Set) Remove(e string) {
 	delete(s.set, e)
 }
 
@@ -77,7 +79,7 @@ func addSafe(m map[string]data.Set[metadata], e string, md metadata) {
 	old.Add(md)
 }
 
-func (s *SORSet) Merge(o SORSet) {
+func (s *Set) Merge(o Set) {
 	U := make(map[string]data.Set[metadata])
 	for e, ma := range s.set {
 		ma.ForEach(func(m metadata) {
@@ -109,3 +111,9 @@ func (s *SORSet) Merge(o SORSet) {
 	s.set = U
 	s.vclock.Merge(o.vclock)
 }
+
+func (s *Set) GetEvent() crdt.Event[CRDT] {
+	return crdt.Event[CRDT]{}
+}
+
+func (s *Set) PersistEvent(event crdt.Event[CRDT]) {}
