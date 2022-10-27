@@ -27,6 +27,7 @@ type ChiaveClient interface {
 	Get(ctx context.Context, in *Key, opts ...grpc.CallOption) (*GetResponse, error)
 	Increment(ctx context.Context, in *Key, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	Decrement(ctx context.Context, in *Key, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	ProcessEvent(ctx context.Context, in *Event, opts ...grpc.CallOption) (*emptypb.Empty, error)
 }
 
 type chiaveClient struct {
@@ -73,6 +74,15 @@ func (c *chiaveClient) Decrement(ctx context.Context, in *Key, opts ...grpc.Call
 	return out, nil
 }
 
+func (c *chiaveClient) ProcessEvent(ctx context.Context, in *Event, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, "/chiave.Chiave/ProcessEvent", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ChiaveServer is the server API for Chiave service.
 // All implementations must embed UnimplementedChiaveServer
 // for forward compatibility
@@ -81,6 +91,7 @@ type ChiaveServer interface {
 	Get(context.Context, *Key) (*GetResponse, error)
 	Increment(context.Context, *Key) (*emptypb.Empty, error)
 	Decrement(context.Context, *Key) (*emptypb.Empty, error)
+	ProcessEvent(context.Context, *Event) (*emptypb.Empty, error)
 	mustEmbedUnimplementedChiaveServer()
 }
 
@@ -99,6 +110,9 @@ func (UnimplementedChiaveServer) Increment(context.Context, *Key) (*emptypb.Empt
 }
 func (UnimplementedChiaveServer) Decrement(context.Context, *Key) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Decrement not implemented")
+}
+func (UnimplementedChiaveServer) ProcessEvent(context.Context, *Event) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ProcessEvent not implemented")
 }
 func (UnimplementedChiaveServer) mustEmbedUnimplementedChiaveServer() {}
 
@@ -185,6 +199,24 @@ func _Chiave_Decrement_Handler(srv interface{}, ctx context.Context, dec func(in
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Chiave_ProcessEvent_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Event)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ChiaveServer).ProcessEvent(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/chiave.Chiave/ProcessEvent",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ChiaveServer).ProcessEvent(ctx, req.(*Event))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Chiave_ServiceDesc is the grpc.ServiceDesc for Chiave service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -207,6 +239,10 @@ var Chiave_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Decrement",
 			Handler:    _Chiave_Decrement_Handler,
+		},
+		{
+			MethodName: "ProcessEvent",
+			Handler:    _Chiave_ProcessEvent_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

@@ -7,12 +7,10 @@ option go_package = "kvs/proto/chiave";
 package chiave;
 
 service Chiave {
-  rpc Value(Key) returns (ValueResponse) {}
   rpc Get(Key) returns (GetResponse) {}
   rpc Increment(Key) returns (google.protobuf.Empty) {}
   rpc Decrement(Key) returns (google.protobuf.Empty) {}
-
-  // rpc Delete(Key) returns (Success) {}
+  rpc ProcessEvent(Event) returns (google.protobuf.Empty) {}
 }
 
 message Key {
@@ -20,12 +18,38 @@ message Key {
   int64 worker_id = 2;
 }
 
-message GetResponse {
-  string value = 1;
-  bool exists = 2;
+enum DT {
+  Counter = 0;
+  Set = 1;
 }
 
-message ValueResponse {
-  int64 value = 1;
+message Event {
+  string source = 1;
+  string dest = 2;
+  DT datatype = 3;
+  oneof data {
+    OpCounter op_counter = 4;
+    StateCounter state_counter = 5;
+    DeltaCounter delta_counter = 6;
+  }
+}
+
+message OpCounter {
+  int64 update = 1;
+}
+
+message StateCounter {
+  map<string, int64> pos = 1;
+  map<string, int64> neg = 2;
+}
+
+message DeltaCounter {
+  map<string, int64> pos = 1;
+  map<string, int64> neg = 2;
+}
+
+
+message GetResponse {
+  string value = 1;
   bool exists = 2;
 }
