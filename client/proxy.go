@@ -9,16 +9,8 @@ import (
 	"time"
 
 	"github.com/buraksezer/consistent"
-	farmhash "github.com/leemcloughlin/gofarmhash"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 )
-
-type hasher struct{}
-
-func (hasher) Sum64(data []byte) uint64 {
-	return farmhash.Hash64(data)
-}
 
 type Proxy struct {
 	connections map[string]*grpc.ClientConn
@@ -27,30 +19,10 @@ type Proxy struct {
 }
 
 func NewProxy(repFactor, threadsPerServer int) *Proxy {
-	serverAddrs := []string{
-		"localhost:4747",
-	}
-	cfg := consistent.Config{
-		PartitionCount:    5, // TODO: change?
-		ReplicationFactor: repFactor,
-		Load:              1.25, // TODO: change?
-		Hasher:            hasher{},
-	}
 	p := &Proxy{
-		connections: make(map[string]*grpc.ClientConn),
-		hashRing:    consistent.New(nil, cfg),
+		connections: util.GetConnections(),
+		hashRing:    util.GetHashRing(),
 		repFactor:   repFactor,
-	}
-	for _, addr := range serverAddrs {
-		// TODO: change from insecure credentials
-		conn, err := grpc.Dial(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
-		if err != nil {
-			continue
-		}
-		p.connections[addr] = conn
-		for k := 0; k < threadsPerServer; k++ {
-			p.hashRing.Add(util.NewReplica(addr, k))
-		}
 	}
 	return p
 }
