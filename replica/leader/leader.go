@@ -4,6 +4,7 @@ import (
 	"context"
 	"kvs/crdt"
 	"kvs/crdt/delta"
+	"kvs/crdt/generator"
 	"kvs/crdt/op"
 	"kvs/crdt/state"
 	pb "kvs/proto"
@@ -25,7 +26,6 @@ const (
 
 type leader[F crdt.Flavor] struct {
 	pb.UnimplementedChiaveServer
-	flavor  crdt.Flavor
 	addr    string
 	workers []worker.Worker[F]
 }
@@ -38,15 +38,15 @@ type Leader interface {
 func NewLeader(opt CRDTOption) Leader {
 	switch opt {
 	case Delta:
-		return LeaderWithFlavor[delta.CRDT](delta.Generator{})
+		return LeaderWithFlavor[crdt.Delta](delta.Generator{})
 	case State:
-		return LeaderWithFlavor[state.CRDT](state.Generator{})
+		return LeaderWithFlavor[crdt.State](state.Generator{})
 	default:
-		return LeaderWithFlavor[op.CRDT](op.Generator{})
+		return LeaderWithFlavor[crdt.Op](op.Generator{})
 	}
 }
 
-func LeaderWithFlavor[F crdt.Flavor](g crdt.Generator[F]) *leader[F] {
+func LeaderWithFlavor[F crdt.Flavor](g generator.Generator[F]) *leader[F] {
 	addr := "localhost:4747" // TODO: read from config
 	workersPerReplica := 5   // TODO: read from config
 	workers := make([]worker.Worker[F], workersPerReplica)
@@ -67,7 +67,23 @@ func (l *leader[_]) StartWorkers() {
 }
 
 func (l *leader[_]) Value(ctx context.Context, in *pb.Key) (*pb.ValueResponse, error) {
+	// v, ok := l.workers[in.WorkerId].Get(in.Id)
+	// c, ok := v.(int)
 	return &pb.ValueResponse{}, nil
+}
+
+func (l *leader[_]) Get(ctx context.Context, in *pb.Key) (*pb.GetResponse, error) {
+	req := worker.ClientRequest{
+		Key:       in.Id,
+		Operation: worker.Increment,
+		Response:  make(chan worker.Response, 1),
+	}
+	l.workers[in.WorkerId].PutRequest(req)
+	r := <-req.Response
+	return &pb.GetResponse{
+		Value:  r.Value,
+		Exists: r.Exists,
+	}, nil
 }
 
 func (l *leader[_]) Increment(ctx context.Context, in *pb.Key) (*emptypb.Empty, error) {
