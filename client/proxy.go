@@ -12,6 +12,10 @@ import (
 	"google.golang.org/grpc"
 )
 
+const (
+	RPCTimeout = 5 * time.Second
+)
+
 type Proxy struct {
 	connections map[string]*grpc.ClientConn
 	hashRing    *consistent.Consistent
@@ -51,7 +55,7 @@ func (p *Proxy) Increment(key string) error {
 	if err != nil {
 		return err
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), RPCTimeout)
 	defer cancel()
 	_, err = leader.Increment(ctx, &pb.Key{Id: key})
 	if err != nil {
@@ -65,7 +69,7 @@ func (p *Proxy) Decrement(key string) error {
 	if err != nil {
 		return err
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), RPCTimeout)
 	defer cancel()
 	_, err = leader.Decrement(ctx, &pb.Key{Id: key})
 	if err != nil {
@@ -74,16 +78,16 @@ func (p *Proxy) Decrement(key string) error {
 	return nil
 }
 
-func (p *Proxy) Value(key string) (int64, error) {
+func (p *Proxy) Get(key string) (string, error) {
 	leader, err := p.chooseLeader(key)
 	if err != nil {
-		return 0, err
+		return "", err
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), RPCTimeout)
 	defer cancel()
-	r, err := leader.Value(ctx, &pb.Key{Id: key})
+	r, err := leader.Get(ctx, &pb.Key{Id: key})
 	if err != nil {
-		return 0, err
+		return "", err
 	}
 	return r.Value, nil
 }
