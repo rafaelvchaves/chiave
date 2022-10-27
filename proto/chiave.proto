@@ -8,6 +8,7 @@ package chiave;
 
 service Chiave {
   rpc Value(Key) returns (ValueResponse) {}
+  rpc Get(Key) returns (GetResponse) {}
   rpc Increment(Key) returns (google.protobuf.Empty) {}
   rpc Decrement(Key) returns (google.protobuf.Empty) {}
 
@@ -17,6 +18,11 @@ service Chiave {
 message Key {
   string id = 1;
   int64 worker_id = 2;
+}
+
+message GetResponse {
+  string value = 1;
+  bool exists = 2;
 }
 
 message ValueResponse {

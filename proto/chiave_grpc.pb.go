@@ -24,6 +24,7 @@ const _ = grpc.SupportPackageIsVersion7
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type ChiaveClient interface {
 	Value(ctx context.Context, in *Key, opts ...grpc.CallOption) (*ValueResponse, error)
+	Get(ctx context.Context, in *Key, opts ...grpc.CallOption) (*GetResponse, error)
 	Increment(ctx context.Context, in *Key, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	Decrement(ctx context.Context, in *Key, opts ...grpc.CallOption) (*emptypb.Empty, error)
 }
@@ -39,6 +40,15 @@ func NewChiaveClient(cc grpc.ClientConnInterface) ChiaveClient {
 func (c *chiaveClient) Value(ctx context.Context, in *Key, opts ...grpc.CallOption) (*ValueResponse, error) {
 	out := new(ValueResponse)
 	err := c.cc.Invoke(ctx, "/chiave.Chiave/Value", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *chiaveClient) Get(ctx context.Context, in *Key, opts ...grpc.CallOption) (*GetResponse, error) {
+	out := new(GetResponse)
+	err := c.cc.Invoke(ctx, "/chiave.Chiave/Get", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -68,6 +78,7 @@ func (c *chiaveClient) Decrement(ctx context.Context, in *Key, opts ...grpc.Call
 // for forward compatibility
 type ChiaveServer interface {
 	Value(context.Context, *Key) (*ValueResponse, error)
+	Get(context.Context, *Key) (*GetResponse, error)
 	Increment(context.Context, *Key) (*emptypb.Empty, error)
 	Decrement(context.Context, *Key) (*emptypb.Empty, error)
 	mustEmbedUnimplementedChiaveServer()
@@ -79,6 +90,9 @@ type UnimplementedChiaveServer struct {
 
 func (UnimplementedChiaveServer) Value(context.Context, *Key) (*ValueResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Value not implemented")
+}
+func (UnimplementedChiaveServer) Get(context.Context, *Key) (*GetResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Get not implemented")
 }
 func (UnimplementedChiaveServer) Increment(context.Context, *Key) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Increment not implemented")
@@ -113,6 +127,24 @@ func _Chiave_Value_Handler(srv interface{}, ctx context.Context, dec func(interf
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(ChiaveServer).Value(ctx, req.(*Key))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Chiave_Get_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Key)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ChiaveServer).Get(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/chiave.Chiave/Get",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ChiaveServer).Get(ctx, req.(*Key))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -163,6 +195,10 @@ var Chiave_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Value",
 			Handler:    _Chiave_Value_Handler,
+		},
+		{
+			MethodName: "Get",
+			Handler:    _Chiave_Get_Handler,
 		},
 		{
 			MethodName: "Increment",
