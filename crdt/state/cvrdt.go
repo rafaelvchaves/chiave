@@ -9,13 +9,11 @@ type CRDT struct{}
 
 type Generator struct{}
 
-func (Generator) New(dt crdt.DataType, r util.Replica) crdt.CRDT[CRDT] {
+func (Generator) New(dt crdt.DataType, r util.Replica) crdt.CRDT[crdt.State] {
 	switch dt {
 	case crdt.CType:
 		return NewCounter(r)
-	case crdt.SType:
-		return NewSet(r)
 	default:
-		return NewGraph(r)
+		return NewSet(r)
 	}
 }

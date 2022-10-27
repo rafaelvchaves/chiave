@@ -1,7 +1,6 @@
-package state
+package delta
 
 import (
-	"fmt"
 	"kvs/util"
 )
 
@@ -17,6 +16,7 @@ const (
 type GCounter struct {
 	replica util.Replica
 	vec     map[string]int
+	delta   map[string]int
 }
 
 func NewGCounter(replica util.Replica) GCounter {
@@ -25,6 +25,7 @@ func NewGCounter(replica util.Replica) GCounter {
 	return GCounter{
 		replica: replica,
 		vec:     vec,
+		delta:   make(map[string]int),
 	}
 }
 
@@ -33,9 +34,11 @@ func (g *GCounter) Increment() {
 	v, ok := g.vec[id]
 	if !ok {
 		g.vec[id] = 1
+		g.delta[id] = 1
 		return
 	}
 	g.vec[id] = v + 1
+	g.delta[id] = v + 1
 }
 
 func (g *GCounter) Value() int {
@@ -46,8 +49,8 @@ func (g *GCounter) Value() int {
 	return sum
 }
 
-func (g *GCounter) SafeGet(r string) int {
-	v, ok := g.vec[r]
+func safeGet(m map[string]int, r string) int {
+	v, ok := m[r]
 	if !ok {
 		return 0
 	}
@@ -57,7 +60,7 @@ func (g *GCounter) SafeGet(r string) int {
 func (g *GCounter) Compare(o GCounter) Ord {
 	ord := EQ
 	for k, va := range g.vec {
-		vb := o.SafeGet(k)
+		vb := safeGet(o.vec, k)
 		switch {
 		case ord == EQ && va > vb:
 			ord = GT
@@ -72,21 +75,17 @@ func (g *GCounter) Compare(o GCounter) Ord {
 	return ord
 }
 
-func (g GCounter) String() string {
-	return fmt.Sprintf("%v", g.vec)
-}
-
-func (g *GCounter) Merge(o GCounter) {
-	for k, vo := range o.vec {
-		v := g.SafeGet(k)
+func (g *GCounter) Merge(delta map[string]int) {
+	for k, vo := range delta {
+		v := safeGet(g.vec, k)
 		g.vec[k] = util.Max(v, vo)
+		vd := safeGet(g.delta, k)
+		g.delta[k] = util.Max(vd, vo)
 	}
 }
 
-func (g *GCounter) Copy() GCounter {
-	cpy := NewGCounter(g.replica)
-	for k, v := range g.vec {
-		cpy.vec[k] = v
-	}
-	return cpy
+func (g *GCounter) GetDelta() map[string]int {
+	d := g.delta
+	g.delta = make(map[string]int)
+	return d
 }

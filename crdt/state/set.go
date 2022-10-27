@@ -111,8 +111,10 @@ func (s *Set) Merge(o Set) {
 	s.vclock.Merge(o.vclock)
 }
 
-func (s *Set) GetEvent() crdt.Event[CRDT] {
-	return crdt.Event[CRDT]{}
+func (s *Set) GetEvent() crdt.Event {
+	return crdt.Event{}
 }
 
-func (s *Set) PersistEvent(event crdt.Event[CRDT]) {}
+func (s *Set) PersistEvent(event crdt.Event) {}
+
+func (s *Set) String() string { return "" }

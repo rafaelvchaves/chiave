@@ -4,10 +4,6 @@ import (
 	"kvs/util"
 )
 
-type Generator[F Flavor] interface {
-	New(DataType, util.Replica) CRDT[F]
-}
-
 type DataType int
 
 const (
@@ -16,9 +12,15 @@ const (
 	GType
 )
 
-type Flavor any
+type Delta struct{}
+type State struct{}
+type Op struct{}
 
-type Event[F Flavor] struct {
+type Flavor interface {
+	Delta | State | Op
+}
+
+type Event struct {
 	Source util.Replica
 	Type   DataType
 	Key    string
@@ -26,8 +28,9 @@ type Event[F Flavor] struct {
 }
 
 type CRDT[F Flavor] interface {
-	GetEvent() Event[F]
-	PersistEvent(Event[F])
+	String() string
+	GetEvent() Event
+	PersistEvent(Event)
 }
 
 // Counters
