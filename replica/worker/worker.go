@@ -1,18 +1,26 @@
 package worker
 
 import (
+	"fmt"
 	"kvs/crdt"
 	"kvs/crdt/generator"
+	pb "kvs/proto"
 	"kvs/util"
+	"os"
 	"time"
+
+	"github.com/buraksezer/consistent"
+	"google.golang.org/grpc"
 )
 
 type Worker[F crdt.Flavor] struct {
-	replica   util.Replica
-	generator generator.Generator[F]
-	kvs       Store[F]
-	requests  chan ClientRequest
-	events    chan crdt.Event
+	replica     util.Replica
+	generator   generator.Generator[F]
+	kvs         Store[F]
+	requests    chan ClientRequest
+	events      chan crdt.Event
+	hashRing    *consistent.Consistent
+	connections map[string]*grpc.ClientConn
 }
 
 type Operation int
@@ -37,11 +45,13 @@ type Response = struct {
 
 func New[F crdt.Flavor](replica util.Replica, kvs Store[F], generator generator.Generator[F]) Worker[F] {
 	return Worker[F]{
-		generator: generator,
-		replica:   replica,
-		kvs:       kvs,
-		requests:  make(chan ClientRequest),
-		events:    make(chan crdt.Event),
+		generator:   generator,
+		replica:     replica,
+		kvs:         kvs,
+		requests:    make(chan ClientRequest),
+		events:      make(chan crdt.Event),
+		hashRing:    util.GetHashRing(),
+		connections: util.GetConnections(),
 	}
 }
 
@@ -122,7 +132,21 @@ func (w *Worker[F]) broadcast(event crdt.Event) {
 	// (2): for each leader, send an RPC (ProcessEvent?)
 	// (3): on leader side, processEvent implementation should simply
 	// invoke the PutEvent() method on the proper worker.
-
+	leaders, err := w.hashRing.GetClosestN([]byte(event.Key), 3)
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+	for _, l := range leaders {
+		v := l.(util.Replica)
+		conn, ok := w.connections[v.Addr]
+		if !ok {
+			//
+			os.Exit(1)
+		}
+		_ = pb.NewChiaveClient(conn)
+		// client.
+	}
 	// should broadcast work differently depending on flavor?
 }
 
