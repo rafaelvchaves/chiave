@@ -51,12 +51,12 @@ func GetHashRing() *consistent.Consistent {
 	addrs := []string{
 		"localhost:4747",
 	}
-	repFactor := 3
-	workersPerReplica := 5
+	repFactor := 2
+	workersPerReplica := 3
 	cfg := consistent.Config{
 		PartitionCount:    5, // TODO: change?
 		ReplicationFactor: repFactor,
-		Load:              1.25, // TODO: change?
+		Load:              3, // TODO: change?
 		Hasher:            hasher{},
 	}
 	hashRing := consistent.New(nil, cfg)

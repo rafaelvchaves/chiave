@@ -51,7 +51,7 @@ type Set interface {
 type Vertex string
 
 type Edge struct {
-	src, dest string
+	// src, dest string
 }
 
 type Graph interface {
