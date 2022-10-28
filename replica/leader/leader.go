@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"kvs/crdt"
 	"kvs/crdt/delta"
@@ -20,10 +21,22 @@ import (
 type CRDTOption int
 
 const (
-	Delta CRDTOption = iota
+	Op CRDTOption = iota
 	State
-	Op
+	Delta
 )
+
+var fromString = map[string]CRDTOption{
+	"op":    Op,
+	"state": State,
+	"delta": Delta,
+}
+
+var toString = map[CRDTOption]string{
+	Op:    "op",
+	State: "state",
+	Delta: "delta",
+}
 
 type leader[F crdt.Flavor] struct {
 	pb.UnimplementedChiaveServer
@@ -37,26 +50,25 @@ type Leader interface {
 	pb.ChiaveServer
 }
 
-func NewLeader(opt CRDTOption) Leader {
+func NewLeader(addr string, opt CRDTOption) Leader {
 	switch opt {
 	case Delta:
-		return LeaderWithFlavor[crdt.Delta](delta.Generator{})
+		return LeaderWithFlavor[crdt.Delta](addr, delta.Generator{})
 	case State:
-		return LeaderWithFlavor[crdt.State](state.Generator{})
+		return LeaderWithFlavor[crdt.State](addr, state.Generator{})
 	default:
-		return LeaderWithFlavor[crdt.Op](op.Generator{})
+		return LeaderWithFlavor[crdt.Op](addr, op.Generator{})
 	}
 }
 
-func LeaderWithFlavor[F crdt.Flavor](g generator.Generator[F]) *leader[F] {
+func LeaderWithFlavor[F crdt.Flavor](addr string, g generator.Generator[F]) *leader[F] {
 	l, err := util.NewLogger("log.txt")
 	if err != nil {
 		panic(fmt.Sprintf("error creating logger: %v", err))
 	}
-	addr := "localhost:4747" // TODO: read from config
-	workersPerReplica := 5   // TODO: read from config
-	workers := make([]*worker.Worker[F], workersPerReplica)
-	for i := 0; i < workersPerReplica; i++ {
+	cfg := util.LoadConfig()
+	workers := make([]*worker.Worker[F], cfg.WorkersPerServer)
+	for i := 0; i < cfg.WorkersPerServer; i++ {
 		r := util.NewReplica(addr, i)
 		workers[i] = worker.New(r, g, l)
 	}
@@ -106,13 +118,18 @@ func (l *leader[_]) Decrement(ctx context.Context, in *pb.Key) (*emptypb.Empty, 
 }
 
 func main() {
-	leader := NewLeader(Op)
+	addr := flag.String("a", "localhost:4747", "ip address to start leader at")
+	flavor := flag.String("crdt", "op", "CRDT flavor (op, state, delta)")
+	flag.Parse()
+	f := fromString[*flavor]
+	fmt.Printf("using %s CRDTs\n", toString[f])
+	leader := NewLeader(*addr, f)
 	leader.StartWorkers()
-	addr := "localhost:4747"
-	listener, err := net.Listen("tcp", addr)
+	listener, err := net.Listen("tcp", *addr)
 	if err != nil {
 		return
 	}
+	fmt.Printf("serving at %q...\n", *addr)
 	server := grpc.NewServer()
 	pb.RegisterChiaveServer(server, leader)
 	server.Serve(listener)
