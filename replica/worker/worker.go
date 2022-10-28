@@ -21,6 +21,7 @@ type Worker[F crdt.Flavor] struct {
 	events      chan crdt.Event
 	hashRing    *consistent.Consistent
 	connections map[string]*grpc.ClientConn
+	logger      *util.Logger
 }
 
 type Operation int
@@ -43,15 +44,16 @@ type Response = struct {
 	Exists bool
 }
 
-func New[F crdt.Flavor](replica util.Replica, kvs Store[F], generator generator.Generator[F]) *Worker[F] {
+func New[F crdt.Flavor](replica util.Replica, generator generator.Generator[F], logger *util.Logger) *Worker[F] {
 	return &Worker[F]{
 		generator:   generator,
 		replica:     replica,
-		kvs:         kvs,
+		kvs:         NewCache[F](),
 		requests:    make(chan ClientRequest),
 		events:      make(chan crdt.Event),
 		hashRing:    util.GetHashRing(),
 		connections: util.GetConnections(),
+		logger:      logger,
 	}
 }
 
@@ -68,7 +70,8 @@ func (w *Worker[F]) Start() {
 	for {
 		// set of keys modified in this epoch
 		changeset := util.NewSet[string]()
-		reqLoop: for {
+	reqLoop:
+		for {
 			// phase 1: receive client requests and convert to events
 			select {
 			case req := <-w.requests:
@@ -91,7 +94,8 @@ func (w *Worker[F]) Start() {
 		})
 
 		// phase 3: drain event queue and persist all events
-		eventLoop: for {
+	eventLoop:
+		for {
 			select {
 			case event := <-w.events:
 				v := w.kvs.GetOrDefault(event.Key, w.generator.New(event.Type, w.replica))
@@ -132,6 +136,7 @@ func (w *Worker[F]) process(r ClientRequest) {
 			Exists: ok,
 		}
 	}
+	fmt.Printf("%s: %s\n", w.replica.String(), w.kvs.String())
 }
 
 func (w *Worker[F]) broadcast(event crdt.Event) {

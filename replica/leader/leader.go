@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"kvs/crdt"
 	"kvs/crdt/delta"
 	"kvs/crdt/generator"
@@ -28,6 +29,7 @@ type leader[F crdt.Flavor] struct {
 	pb.UnimplementedChiaveServer
 	addr    string
 	workers []*worker.Worker[F]
+	logger  *util.Logger
 }
 
 type Leader interface {
@@ -47,16 +49,21 @@ func NewLeader(opt CRDTOption) Leader {
 }
 
 func LeaderWithFlavor[F crdt.Flavor](g generator.Generator[F]) *leader[F] {
+	l, err := util.NewLogger("log.txt")
+	if err != nil {
+		panic(fmt.Sprintf("error creating logger: %v", err))
+	}
 	addr := "localhost:4747" // TODO: read from config
 	workersPerReplica := 5   // TODO: read from config
 	workers := make([]*worker.Worker[F], workersPerReplica)
 	for i := 0; i < workersPerReplica; i++ {
 		r := util.NewReplica(addr, i)
-		workers[i] = worker.New(r, worker.NewCache[F](), g)
+		workers[i] = worker.New(r, g, l)
 	}
 	return &leader[F]{
 		addr:    addr,
 		workers: workers,
+		logger:  l,
 	}
 }
 

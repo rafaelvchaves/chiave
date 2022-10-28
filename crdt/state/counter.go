@@ -33,7 +33,7 @@ func (c *Counter) Decrement() {
 }
 
 func (c Counter) String() string {
-	return c.replica.String() + ": " + c.pos.String() + ", " + c.neg.String()
+	return fmt.Sprintf("%d", c.Value())
 }
 
 func (c *Counter) Merge(o Counter) {

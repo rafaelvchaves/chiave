@@ -15,7 +15,7 @@ service Chiave {
 
 message Key {
   string id = 1;
-  int64 worker_id = 2;
+  int32 worker_id = 2;
 }
 
 enum DT {
