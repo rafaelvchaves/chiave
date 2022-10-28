@@ -5,6 +5,7 @@ import (
 	"fmt"
 	pb "kvs/proto"
 	"kvs/util"
+	"log"
 	"math/rand"
 	"time"
 
@@ -22,7 +23,7 @@ type Proxy struct {
 	repFactor   int
 }
 
-func NewProxy(repFactor, threadsPerServer int) *Proxy {
+func NewProxy(repFactor int) *Proxy {
 	p := &Proxy{
 		connections: util.GetConnections(),
 		hashRing:    util.GetHashRing(),
@@ -36,6 +37,7 @@ func (p *Proxy) chooseLeader(key string) (pb.ChiaveClient, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	// pick owner randomly
 	rand.Seed(time.Now().UnixNano())
 	rand.Shuffle(len(owners), func(i, j int) { owners[i], owners[j] = owners[j], owners[i] })
@@ -43,6 +45,7 @@ func (p *Proxy) chooseLeader(key string) (pb.ChiaveClient, error) {
 		addr := owner.(util.Replica).Addr
 		conn, ok := p.connections[addr]
 		if !ok {
+			log.Fatalf("connection to %q not found", addr)
 			continue
 		}
 		return pb.NewChiaveClient(conn), nil
