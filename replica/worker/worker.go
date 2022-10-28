@@ -34,7 +34,7 @@ const (
 type ClientRequest struct {
 	Key       string
 	Operation Operation
-	Params    any
+	Params    []string
 	Response  chan Response
 }
 
@@ -43,8 +43,8 @@ type Response = struct {
 	Exists bool
 }
 
-func New[F crdt.Flavor](replica util.Replica, kvs Store[F], generator generator.Generator[F]) Worker[F] {
-	return Worker[F]{
+func New[F crdt.Flavor](replica util.Replica, kvs Store[F], generator generator.Generator[F]) *Worker[F] {
+	return &Worker[F]{
 		generator:   generator,
 		replica:     replica,
 		kvs:         kvs,
@@ -67,9 +67,8 @@ func (w *Worker[F]) Start() {
 	requestDeadline := 100 * time.Millisecond
 	for {
 		// set of keys modified in this epoch
-		var changeset util.Set[string]
-	reqLoop:
-		for {
+		changeset := util.NewSet[string]()
+		reqLoop: for {
 			// phase 1: receive client requests and convert to events
 			select {
 			case req := <-w.requests:
@@ -87,14 +86,19 @@ func (w *Worker[F]) Start() {
 			}
 			e := v.GetEvent()
 			e.Key = key
-			w.broadcast(e)
+			// w.broadcast(e)
 			return true
 		})
 
 		// phase 3: drain event queue and persist all events
-		for event := range w.events {
-			v := w.kvs.GetOrDefault(event.Key, w.generator.New(event.Type, w.replica))
-			v.PersistEvent(event)
+		eventLoop: for {
+			select {
+			case event := <-w.events:
+				v := w.kvs.GetOrDefault(event.Key, w.generator.New(event.Type, w.replica))
+				v.PersistEvent(event)
+			case <-time.After(requestDeadline):
+				break eventLoop
+			}
 		}
 	}
 }
@@ -108,7 +112,7 @@ func (w *Worker[F]) process(r ClientRequest) {
 			return
 		}
 		counter.Increment()
-		// w.kvs.Put(r.Key, v)
+		w.kvs.Put(r.Key, v)
 	case Decrement:
 		v := w.kvs.GetOrDefault(r.Key, w.generator.New(crdt.CType, w.replica))
 		counter, ok := v.(crdt.Counter)
@@ -116,11 +120,15 @@ func (w *Worker[F]) process(r ClientRequest) {
 			return
 		}
 		counter.Decrement()
-		// w.kvs.Put(r.Key, v)
+		w.kvs.Put(r.Key, v)
 	case Get:
+		var value string
 		v, ok := w.kvs.Get(r.Key)
+		if ok {
+			value = v.String()
+		}
 		r.Response <- Response{
-			Value:  v.String(),
+			Value:  value,
 			Exists: ok,
 		}
 	}

@@ -27,7 +27,7 @@ const (
 type leader[F crdt.Flavor] struct {
 	pb.UnimplementedChiaveServer
 	addr    string
-	workers []worker.Worker[F]
+	workers []*worker.Worker[F]
 }
 
 type Leader interface {
@@ -49,7 +49,7 @@ func NewLeader(opt CRDTOption) Leader {
 func LeaderWithFlavor[F crdt.Flavor](g generator.Generator[F]) *leader[F] {
 	addr := "localhost:4747" // TODO: read from config
 	workersPerReplica := 5   // TODO: read from config
-	workers := make([]worker.Worker[F], workersPerReplica)
+	workers := make([]*worker.Worker[F], workersPerReplica)
 	for i := 0; i < workersPerReplica; i++ {
 		r := util.NewReplica(addr, i)
 		workers[i] = worker.New(r, worker.NewCache[F](), g)
@@ -75,7 +75,7 @@ func (l *leader[_]) Value(ctx context.Context, in *pb.Key) (*pb.ValueResponse, e
 func (l *leader[_]) Get(ctx context.Context, in *pb.Key) (*pb.GetResponse, error) {
 	req := worker.ClientRequest{
 		Key:       in.Id,
-		Operation: worker.Increment,
+		Operation: worker.Get,
 		Response:  make(chan worker.Response, 1),
 	}
 	l.workers[in.WorkerId].PutRequest(req)
