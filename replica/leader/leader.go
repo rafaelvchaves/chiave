@@ -66,12 +66,6 @@ func (l *leader[_]) StartWorkers() {
 	}
 }
 
-func (l *leader[_]) Value(ctx context.Context, in *pb.Key) (*pb.ValueResponse, error) {
-	// v, ok := l.workers[in.WorkerId].Get(in.Id)
-	// c, ok := v.(int)
-	return &pb.ValueResponse{}, nil
-}
-
 func (l *leader[_]) Get(ctx context.Context, in *pb.Key) (*pb.GetResponse, error) {
 	req := worker.ClientRequest{
 		Key:       in.Id,
