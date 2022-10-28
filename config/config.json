@@ -1,0 +1,9 @@
+{
+  "rep_factor": 3,
+  "workers_per_server": 4,
+  "partition_count": 5,
+  "load": 1.25,
+  "addresses": [
+    "localhost:4747"
+  ]
+}
