@@ -9,6 +9,8 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
+var cfg = LoadConfig()
+
 type Replica struct {
 	Addr     string
 	WorkerID int
@@ -32,11 +34,8 @@ func (hasher) Sum64(data []byte) uint64 {
 }
 
 func GetConnections() map[string]*grpc.ClientConn {
-	addrs := []string{
-		"localhost:4747",
-	}
 	connections := make(map[string]*grpc.ClientConn)
-	for _, addr := range addrs {
+	for _, addr := range cfg.Addresses {
 		// TODO: change from insecure credentials
 		conn, err := grpc.Dial(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 		if err != nil {
@@ -48,20 +47,15 @@ func GetConnections() map[string]*grpc.ClientConn {
 }
 
 func GetHashRing() *consistent.Consistent {
-	addrs := []string{
-		"localhost:4747",
-	}
-	repFactor := 2
-	workersPerReplica := 3
-	cfg := consistent.Config{
-		PartitionCount:    5, // TODO: change?
-		ReplicationFactor: repFactor,
-		Load:              3, // TODO: change?
+	hashCfg := consistent.Config{
+		PartitionCount:    cfg.PartitionCount,
+		ReplicationFactor: cfg.RepFactor,
+		Load:              cfg.Load,
 		Hasher:            hasher{},
 	}
-	hashRing := consistent.New(nil, cfg)
-	for _, addr := range addrs {
-		for k := 0; k < workersPerReplica; k++ {
+	hashRing := consistent.New(nil, hashCfg)
+	for _, addr := range cfg.Addresses {
+		for k := 0; k < cfg.WorkersPerServer; k++ {
 			hashRing.Add(NewReplica(addr, k))
 		}
 	}
