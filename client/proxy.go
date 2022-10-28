@@ -5,7 +5,6 @@ import (
 	"fmt"
 	pb "kvs/proto"
 	"kvs/util"
-	"log"
 	"math/rand"
 	"time"
 
@@ -32,67 +31,80 @@ func NewProxy(repFactor int) *Proxy {
 	return p
 }
 
-func (p *Proxy) chooseLeader(key string) (pb.ChiaveClient, error) {
+func (p *Proxy) ownersOf(key string) ([]consistent.Member, error) {
 	owners, err := p.hashRing.GetClosestN([]byte(key), p.repFactor)
 	if err != nil {
 		return nil, err
 	}
-
 	// pick owner randomly
 	rand.Seed(time.Now().UnixNano())
 	rand.Shuffle(len(owners), func(i, j int) { owners[i], owners[j] = owners[j], owners[i] })
-	for _, owner := range owners {
-		addr := owner.(util.Replica).Addr
-		conn, ok := p.connections[addr]
-		if !ok {
-			log.Fatalf("connection to %q not found", addr)
-			continue
-		}
-		return pb.NewChiaveClient(conn), nil
-	}
-	return nil, fmt.Errorf("connection to key owners failed")
+	return owners, nil
 }
 
 func (p *Proxy) Increment(key string) error {
-	leader, err := p.chooseLeader(key)
+	owners, err := p.ownersOf(key)
 	if err != nil {
 		return err
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), RPCTimeout)
-	defer cancel()
-	_, err = leader.Increment(ctx, &pb.Key{Id: key})
-	if err != nil {
-		return err
+	for _, owner := range owners {
+		r := owner.(util.Replica)
+		client := pb.NewChiaveClient(p.connections[r.Addr])
+		ctx, cancel := context.WithTimeout(context.Background(), RPCTimeout)
+		defer cancel()
+		_, err := client.Increment(ctx, &pb.Key{
+			Id:       key,
+			WorkerId: int32(r.WorkerID),
+		})
+		if err == nil {
+			// if no error occured during RPC, then return. Otherwise, try the next
+			// owner.
+			return nil
+		}
 	}
-	return nil
+	return fmt.Errorf("failed to reach owners of key %q", key)
 }
 
 func (p *Proxy) Decrement(key string) error {
-	leader, err := p.chooseLeader(key)
+	owners, err := p.ownersOf(key)
 	if err != nil {
 		return err
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), RPCTimeout)
-	defer cancel()
-	_, err = leader.Decrement(ctx, &pb.Key{Id: key})
-	if err != nil {
-		return err
+	for _, owner := range owners {
+		r := owner.(util.Replica)
+		client := pb.NewChiaveClient(p.connections[r.Addr])
+		ctx, cancel := context.WithTimeout(context.Background(), RPCTimeout)
+		defer cancel()
+		_, err := client.Decrement(ctx, &pb.Key{
+			Id:       key,
+			WorkerId: int32(r.WorkerID),
+		})
+		if err == nil {
+			return nil
+		}
 	}
-	return nil
+	return fmt.Errorf("failed to reach owners of key %q", key)
 }
 
 func (p *Proxy) Get(key string) (string, error) {
-	leader, err := p.chooseLeader(key)
+	owners, err := p.ownersOf(key)
 	if err != nil {
 		return "", err
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), RPCTimeout)
-	defer cancel()
-	r, err := leader.Get(ctx, &pb.Key{Id: key})
-	if err != nil {
-		return "", err
+	for _, owner := range owners {
+		r := owner.(util.Replica)
+		client := pb.NewChiaveClient(p.connections[r.Addr])
+		ctx, cancel := context.WithTimeout(context.Background(), RPCTimeout)
+		defer cancel()
+		res, err := client.Get(ctx, &pb.Key{
+			Id:       key,
+			WorkerId: int32(r.WorkerID),
+		})
+		if err == nil {
+			return res.Value, nil
+		}
 	}
-	return r.Value, nil
+	return "", fmt.Errorf("failed to reach owners of key %q", key)
 }
 
 func (p *Proxy) Cleanup() error {
