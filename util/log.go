@@ -6,7 +6,7 @@ import (
 )
 
 type Logger struct {
-	iLogger, wLogger, eLogger *log.Logger
+	iLogger, wLogger, eLogger, fLogger *log.Logger
 }
 
 func NewLogger(filename string) (*Logger, error) {
@@ -15,9 +15,10 @@ func NewLogger(filename string) (*Logger, error) {
 		return nil, err
 	}
 	l := Logger{}
-	l.iLogger = log.New(file, "[INFO] ", log.Ldate|log.Ltime|log.Lshortfile)
-	l.wLogger = log.New(file, "[WARNING] ", log.Ldate|log.Ltime|log.Lshortfile)
-	l.eLogger = log.New(file, "[ERROR] ", log.Ldate|log.Ltime|log.Lshortfile)
+	l.iLogger = log.New(file, "[INFO]\t", log.Ldate|log.Ltime)
+	l.wLogger = log.New(file, "[WARNING]\t", log.Ldate|log.Ltime)
+	l.eLogger = log.New(file, "[ERROR]\t", log.Ldate|log.Ltime)
+	l.fLogger = log.New(file, "[FATAL]\t", log.Ldate|log.Ltime)
 	return &l, nil
 }
 
@@ -31,4 +32,9 @@ func (l *Logger) Warningf(format string, args ...any) {
 
 func (l *Logger) Errorf(format string, args ...any) {
 	l.eLogger.Printf(format, args...)
+}
+
+func (l *Logger) Fatalf(format string, args ...any) {
+	l.fLogger.Printf(format, args...)
+	os.Exit(1)
 }
