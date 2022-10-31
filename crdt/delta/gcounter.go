@@ -15,17 +15,17 @@ const (
 
 type GCounter struct {
 	replica util.Replica
-	vec     map[string]int
-	delta   map[string]int
+	vec     map[string]int64
+	delta   map[string]int64
 }
 
 func NewGCounter(replica util.Replica) GCounter {
-	vec := make(map[string]int)
+	vec := make(map[string]int64)
 	vec[replica.String()] = 0
 	return GCounter{
 		replica: replica,
 		vec:     vec,
-		delta:   make(map[string]int),
+		delta:   make(map[string]int64),
 	}
 }
 
@@ -44,12 +44,12 @@ func (g *GCounter) Increment() {
 func (g *GCounter) Value() int {
 	sum := 0
 	for _, count := range g.vec {
-		sum += count
+		sum += int(count)
 	}
 	return sum
 }
 
-func safeGet(m map[string]int, r string) int {
+func safeGet(m map[string]int64, r string) int64 {
 	v, ok := m[r]
 	if !ok {
 		return 0
@@ -75,7 +75,7 @@ func (g *GCounter) Compare(o GCounter) Ord {
 	return ord
 }
 
-func (g *GCounter) Merge(delta map[string]int) {
+func (g *GCounter) Merge(delta map[string]int64) {
 	for k, vo := range delta {
 		v := safeGet(g.vec, k)
 		g.vec[k] = util.Max(v, vo)
@@ -84,8 +84,8 @@ func (g *GCounter) Merge(delta map[string]int) {
 	}
 }
 
-func (g *GCounter) GetDelta() map[string]int {
+func (g *GCounter) GetDelta() map[string]int64 {
 	d := g.delta
-	g.delta = make(map[string]int)
+	g.delta = make(map[string]int64)
 	return d
 }

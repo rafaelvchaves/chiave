@@ -1,12 +1,12 @@
 package state
 
 import (
-	"kvs/crdt"
+	pb "kvs/proto"
 	"kvs/util"
 )
 
 type metadata struct {
-	timestamp int
+	timestamp int64
 	replica   string
 }
 
@@ -33,7 +33,7 @@ func (s *Set) Add(e string) {
 	c := s.vclock.Value() + 1
 	s.vclock.Increment()
 	md := metadata{
-		timestamp: c,
+		timestamp: int64(c),
 		replica:   s.replica.String(),
 	}
 	mds, ok := s.set[e]
@@ -42,7 +42,7 @@ func (s *Set) Add(e string) {
 		return
 	}
 	mds.RemoveWhere(func(md metadata) bool {
-		return md.timestamp < c // remove all entries older than new timestamp
+		return md.timestamp < int64(c) // remove all entries older than new timestamp
 	})
 	mds.Add(md)
 }
@@ -108,13 +108,13 @@ func (s *Set) Merge(o Set) {
 		})
 	}
 	s.set = U
-	s.vclock.Merge(o.vclock)
+	s.vclock.Merge(o.vclock.vec)
 }
 
-func (s *Set) GetEvent() crdt.Event {
-	return crdt.Event{}
+func (s *Set) GetEvent() *pb.Event {
+	return &pb.Event{}
 }
 
-func (s *Set) PersistEvent(event crdt.Event) {}
+func (s *Set) PersistEvent(event *pb.Event) {}
 
 func (s *Set) String() string { return "" }

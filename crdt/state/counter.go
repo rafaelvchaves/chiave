@@ -2,7 +2,7 @@ package state
 
 import (
 	"fmt"
-	"kvs/crdt"
+	pb "kvs/proto"
 	"kvs/util"
 )
 
@@ -39,8 +39,8 @@ func (c Counter) String() string {
 func (c *Counter) Merge(o Counter) {
 	fmt.Println(c.String())
 	fmt.Println(o.String())
-	c.pos.Merge(o.pos)
-	c.neg.Merge(o.neg)
+	c.pos.Merge(o.pos.vec)
+	c.neg.Merge(o.neg.vec)
 }
 
 func (c *Counter) Copy() Counter {
@@ -50,18 +50,25 @@ func (c *Counter) Copy() Counter {
 	return *cpy
 }
 
-func (c *Counter) GetEvent() crdt.Event {
-	return crdt.Event{
-		Source: c.replica,
-		Type:   crdt.CType,
-		Data:   c.Copy(),
+func (c *Counter) GetEvent() *pb.Event {
+	return &pb.Event{
+		Source:   c.replica.String(),
+		Datatype: pb.DT_Counter,
+		Data: &pb.Event_StateCounter{
+			StateCounter: &pb.StateCounter{
+				Pos: c.pos.Copy().vec,
+				Neg: c.neg.Copy().vec,
+			},
+		},
 	}
 }
 
-func (s *Counter) PersistEvent(event crdt.Event) {
-	c, ok := event.Data.(Counter)
-	if !ok {
+func (s *Counter) PersistEvent(event *pb.Event) {
+	sc := event.GetStateCounter()
+	if sc == nil {
+		fmt.Println("warning: nil state counter encountered in PersistEvent")
 		return
 	}
-	s.Merge(c)
+	s.pos.Merge(sc.Pos)
+	s.neg.Merge(sc.Neg)
 }

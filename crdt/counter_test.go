@@ -3,6 +3,7 @@ package crdt_test
 import (
 	"kvs/crdt"
 	"kvs/crdt/generator"
+	pb "kvs/proto"
 	"kvs/util"
 	"testing"
 )
@@ -23,9 +24,9 @@ func assertEqual[T comparable](t *testing.T, name string, got, want T) {
 }
 
 func testFlavor[F crdt.Flavor](t *testing.T, g generator.Generator[F]) {
-	v1 := g.New(crdt.CType, util.NewReplica("a", 1))
-	v2 := g.New(crdt.CType, util.NewReplica("a", 2))
-	v3 := g.New(crdt.CType, util.NewReplica("a", 3))
+	v1 := g.New(pb.DT_Counter, util.NewReplica("a", 1))
+	v2 := g.New(pb.DT_Counter, util.NewReplica("a", 2))
+	v3 := g.New(pb.DT_Counter, util.NewReplica("a", 3))
 
 	c1 := v1.(crdt.Counter)
 	c2 := v2.(crdt.Counter)

@@ -5,10 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"kvs/crdt"
-	"kvs/crdt/delta"
 	"kvs/crdt/generator"
-	"kvs/crdt/op"
-	"kvs/crdt/state"
 	pb "kvs/proto"
 	"kvs/replica/worker"
 	"kvs/util"
@@ -53,15 +50,15 @@ type Leader interface {
 func NewLeader(addr string, opt CRDTOption) Leader {
 	switch opt {
 	case Delta:
-		return LeaderWithFlavor[crdt.Delta](addr, delta.Generator{})
+		return leaderWithFlavor[crdt.Delta](addr, generator.Delta{})
 	case State:
-		return LeaderWithFlavor[crdt.State](addr, state.Generator{})
+		return leaderWithFlavor[crdt.State](addr, generator.State{})
 	default:
-		return LeaderWithFlavor[crdt.Op](addr, op.Generator{})
+		return leaderWithFlavor[crdt.Op](addr, generator.Op{})
 	}
 }
 
-func LeaderWithFlavor[F crdt.Flavor](addr string, g generator.Generator[F]) *leader[F] {
+func leaderWithFlavor[F crdt.Flavor](addr string, g generator.Generator[F]) *leader[F] {
 	l, err := util.NewLogger("log.txt")
 	if err != nil {
 		panic(fmt.Sprintf("error creating logger: %v", err))
@@ -83,6 +80,11 @@ func (l *leader[_]) StartWorkers() {
 	for _, w := range l.workers {
 		go w.Start()
 	}
+}
+
+func (l *leader[_]) ProcessEvent(ctx context.Context, in *pb.Event) (*emptypb.Empty, error) {
+	l.workers[in.Dest].PutEvent(in)
+	return &emptypb.Empty{}, nil
 }
 
 func (l *leader[_]) Get(ctx context.Context, in *pb.Key) (*pb.GetResponse, error) {

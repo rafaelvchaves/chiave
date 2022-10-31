@@ -1,7 +1,7 @@
 package worker
 
 import (
-	"fmt"
+	"context"
 	"kvs/crdt"
 	"kvs/crdt/generator"
 	pb "kvs/proto"
@@ -13,14 +13,21 @@ import (
 	"google.golang.org/grpc"
 )
 
+const RPCTimeout = 10 * time.Second
+
+type CRDTHandler interface {
+	Broadcast(*pb.Event)
+}
+
 type Worker[F crdt.Flavor] struct {
 	replica     util.Replica
 	generator   generator.Generator[F]
 	kvs         Store[F]
 	requests    chan ClientRequest
-	events      chan crdt.Event
+	events      chan *pb.Event
 	hashRing    *consistent.Consistent
 	connections map[string]*grpc.ClientConn
+	cfg         util.Config
 	logger      *util.Logger
 }
 
@@ -49,10 +56,11 @@ func New[F crdt.Flavor](replica util.Replica, generator generator.Generator[F], 
 		generator:   generator,
 		replica:     replica,
 		kvs:         NewCache[F](),
-		requests:    make(chan ClientRequest),
-		events:      make(chan crdt.Event),
+		requests:    make(chan ClientRequest, 10),
+		events:      make(chan *pb.Event, 10),
 		hashRing:    util.GetHashRing(),
 		connections: util.GetConnections(),
+		cfg:         util.LoadConfig(),
 		logger:      logger,
 	}
 }
@@ -66,7 +74,7 @@ func (w *Worker[F]) Get(key string) (string, bool) {
 }
 
 func (w *Worker[F]) Start() {
-	requestDeadline := 100 * time.Millisecond
+	requestDeadline := 50 * time.Millisecond
 	for {
 		// set of keys modified in this epoch
 		changeset := util.NewSet[string]()
@@ -76,7 +84,9 @@ func (w *Worker[F]) Start() {
 			select {
 			case req := <-w.requests:
 				w.process(req)
-				changeset.Add(req.Key)
+				if req.Operation != Get {
+					changeset.Add(req.Key)
+				}
 			case <-time.After(requestDeadline):
 				break reqLoop
 			}
@@ -89,16 +99,16 @@ func (w *Worker[F]) Start() {
 			}
 			e := v.GetEvent()
 			e.Key = key
-			// w.broadcast(e)
+			w.broadcast(e)
 			return true
 		})
 
-		// phase 3: drain event queue and persist all events
 	eventLoop:
 		for {
 			select {
 			case event := <-w.events:
-				v := w.kvs.GetOrDefault(event.Key, w.generator.New(event.Type, w.replica))
+				w.logger.Infof("worker %d received (%q, %+v) from %q\n", w.replica.WorkerID, event.Key, event.Data, event.Source)
+				v := w.kvs.GetOrDefault(event.Key, w.generator.New(event.Datatype, w.replica))
 				v.PersistEvent(event)
 			case <-time.After(requestDeadline):
 				break eventLoop
@@ -110,7 +120,8 @@ func (w *Worker[F]) Start() {
 func (w *Worker[F]) process(r ClientRequest) {
 	switch r.Operation {
 	case Increment:
-		v := w.kvs.GetOrDefault(r.Key, w.generator.New(crdt.CType, w.replica))
+		w.logger.Infof("replica %s handling increment on key %q", w.replica.String(), r.Key)
+		v := w.kvs.GetOrDefault(r.Key, w.generator.New(pb.DT_Counter, w.replica))
 		counter, ok := v.(crdt.Counter)
 		if !ok {
 			return
@@ -118,7 +129,8 @@ func (w *Worker[F]) process(r ClientRequest) {
 		counter.Increment()
 		w.kvs.Put(r.Key, v)
 	case Decrement:
-		v := w.kvs.GetOrDefault(r.Key, w.generator.New(crdt.CType, w.replica))
+		w.logger.Infof("replica %s handling decrement on key %q", w.replica.String(), r.Key)
+		v := w.kvs.GetOrDefault(r.Key, w.generator.New(pb.DT_Counter, w.replica))
 		counter, ok := v.(crdt.Counter)
 		if !ok {
 			return
@@ -126,6 +138,7 @@ func (w *Worker[F]) process(r ClientRequest) {
 		counter.Decrement()
 		w.kvs.Put(r.Key, v)
 	case Get:
+		w.logger.Infof("replica %s handling get on key %q", w.replica.String(), r.Key)
 		var value string
 		v, ok := w.kvs.Get(r.Key)
 		if ok {
@@ -136,37 +149,35 @@ func (w *Worker[F]) process(r ClientRequest) {
 			Exists: ok,
 		}
 	}
-	fmt.Printf("%s: %s\n", w.replica.String(), w.kvs.String())
+	// fmt.Printf("%s: %s\n", w.replica.String(), w.kvs.String())
 }
 
-func (w *Worker[F]) broadcast(event crdt.Event) {
-	// TODO:
-	// (1): hash event.Key to get address of leader(s)
-	// (2): for each leader, send an RPC (ProcessEvent?)
-	// (3): on leader side, processEvent implementation should simply
-	// invoke the PutEvent() method on the proper worker.
-	leaders, err := w.hashRing.GetClosestN([]byte(event.Key), 3)
+func (w *Worker[F]) broadcast(event *pb.Event) {
+	owners, err := w.hashRing.GetClosestN([]byte(event.Key), w.cfg.RepFactor)
 	if err != nil {
-		fmt.Println(err)
 		os.Exit(1)
 	}
-	for _, l := range leaders {
-		v := l.(util.Replica)
-		conn, ok := w.connections[v.Addr]
-		if !ok {
-			//
-			os.Exit(1)
+	for _, o := range owners {
+		v := o.(util.Replica)
+		if v == w.replica {
+			continue
 		}
-		_ = pb.NewChiaveClient(conn)
-		// client.
+		event.Dest = int32(v.WorkerID)
+		client := pb.NewChiaveClient(w.connections[v.Addr])
+		ctx, cancel := context.WithTimeout(context.Background(), RPCTimeout)
+		defer cancel()
+		w.logger.Infof("worker %d is sending %v to worker %d", w.replica.WorkerID, event.Data, v.WorkerID)
+		_, err := client.ProcessEvent(ctx, event)
+		if err != nil {
+			w.logger.Errorf("ProcessEvent from %s to %s: %v", w.replica.String(), v.String(), err)
+		}
 	}
-	// should broadcast work differently depending on flavor?
 }
 
 func (w *Worker[_]) PutRequest(r ClientRequest) {
 	w.requests <- r
 }
 
-func (w *Worker[F]) PutEvent(e crdt.Event) {
+func (w *Worker[F]) PutEvent(e *pb.Event) {
 	w.events <- e
 }

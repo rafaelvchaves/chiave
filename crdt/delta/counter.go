@@ -2,7 +2,7 @@ package delta
 
 import (
 	"fmt"
-	"kvs/crdt"
+	pb "kvs/proto"
 	"kvs/util"
 )
 
@@ -13,8 +13,8 @@ type Counter struct {
 }
 
 type delta = struct {
-	posDelta map[string]int
-	negDelta map[string]int
+	posDelta map[string]int64
+	negDelta map[string]int64
 }
 
 func NewCounter(replica util.Replica) *Counter {
@@ -46,21 +46,28 @@ func (c *Counter) String() string {
 	return fmt.Sprintf("%d", c.Value())
 }
 
-func (c *Counter) GetEvent() crdt.Event {
-	return crdt.Event{
-		Source: c.replica,
-		Type:   crdt.CType,
-		Data: delta{
-			posDelta: c.pos.GetDelta(),
-			negDelta: c.neg.GetDelta(),
+func (c *Counter) GetEvent() *pb.Event {
+	return &pb.Event{
+		Source:   c.replica.String(),
+		Datatype: pb.DT_Counter,
+		Data: &pb.Event_DeltaCounter{
+			DeltaCounter: &pb.DeltaCounter{
+				Pos: c.pos.GetDelta(),
+				Neg: c.neg.GetDelta(),
+			},
 		},
 	}
 }
 
-func (s *Counter) PersistEvent(event crdt.Event) {
-	d, ok := event.Data.(delta)
-	if !ok {
+func (s *Counter) PersistEvent(event *pb.Event) {
+	dc := event.GetDeltaCounter()
+	if dc == nil {
+		fmt.Println("warning: nil delta counter encountered in PersistEvent")
 		return
+	}
+	d := delta{
+		posDelta: dc.Pos,
+		negDelta: dc.Neg,
 	}
 	s.Merge(d)
 }

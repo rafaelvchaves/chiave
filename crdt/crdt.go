@@ -1,15 +1,7 @@
 package crdt
 
 import (
-	"kvs/util"
-)
-
-type DataType int
-
-const (
-	CType DataType = iota
-	SType
-	GType
+	pb "kvs/proto"
 )
 
 type Delta struct{}
@@ -20,17 +12,10 @@ type Flavor interface {
 	Delta | State | Op
 }
 
-type Event struct {
-	Source util.Replica
-	Type   DataType
-	Key    string
-	Data   any
-}
-
 type CRDT[F Flavor] interface {
 	String() string
-	GetEvent() Event
-	PersistEvent(Event)
+	GetEvent() *pb.Event
+	PersistEvent(*pb.Event)
 }
 
 // Counters
