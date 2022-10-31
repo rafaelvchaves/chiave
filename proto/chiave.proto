@@ -25,12 +25,13 @@ enum DT {
 
 message Event {
   string source = 1;
-  string dest = 2;
-  DT datatype = 3;
+  int32 dest = 2;
+  string key = 3;
+  DT datatype = 4;
   oneof data {
-    OpCounter op_counter = 4;
-    StateCounter state_counter = 5;
-    DeltaCounter delta_counter = 6;
+    OpCounter op_counter = 5;
+    StateCounter state_counter = 6;
+    DeltaCounter delta_counter = 7;
   }
 }
 
@@ -47,7 +48,6 @@ message DeltaCounter {
   map<string, int64> pos = 1;
   map<string, int64> neg = 2;
 }
-
 
 message GetResponse {
   string value = 1;
