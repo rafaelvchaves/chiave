@@ -22,11 +22,11 @@ type Proxy struct {
 	repFactor   int
 }
 
-func NewProxy(repFactor int) *Proxy {
+func NewProxy() *Proxy {
 	p := &Proxy{
 		connections: util.GetConnections(),
 		hashRing:    util.GetHashRing(),
-		repFactor:   repFactor,
+		repFactor:   util.LoadConfig().RepFactor,
 	}
 	return p
 }
@@ -57,10 +57,9 @@ func (p *Proxy) Increment(key string) error {
 			WorkerId: int32(r.WorkerID),
 		})
 		if err == nil {
-			// if no error occured during RPC, then return. Otherwise, try the next
-			// owner.
 			return nil
 		}
+		fmt.Println(err)
 	}
 	return fmt.Errorf("failed to reach owners of key %q", key)
 }
