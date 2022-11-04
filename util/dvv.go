@@ -1,6 +1,10 @@
 package util
 
-import "golang.org/x/exp/constraints"
+import (
+	pb "kvs/proto"
+
+	"golang.org/x/exp/constraints"
+)
 
 type dot struct {
 	r string
@@ -12,17 +16,17 @@ type DVV struct {
 	vv map[string]int32
 }
 
-func (dvv DVV) Lt(odvv DVV) bool {
-	d := dvv.d
-	return d.n <= odvv.vv[d.r]
+func Lt(d1, d2 *pb.DVV) bool {
+	dot := d1.Dot
+	return dot == nil || dot.N <= d2.Clock[dot.Replica]
 }
 
-func sync(D1, D2 []DVV) []DVV {
-	var result []DVV
+func Sync(D1, D2 []*pb.DVV) []*pb.DVV {
+	var result []*pb.DVV
 	for _, x := range D1 {
 		include := true
 		for _, y := range D2 {
-			if x.Lt(y) {
+			if Lt(x, y) {
 				include = false
 				break
 			}
@@ -34,7 +38,7 @@ func sync(D1, D2 []DVV) []DVV {
 	for _, x := range D2 {
 		include := true
 		for _, y := range D1 {
-			if x.Lt(y) {
+			if Lt(x, y) {
 				include = false
 				break
 			}
@@ -46,48 +50,49 @@ func sync(D1, D2 []DVV) []DVV {
 	return result
 }
 
-func (dvv DVV) ids() []string {
+func dvvIDs(dvv *pb.DVV) []string {
 	var result []string
-	result = append(result, dvv.d.r)
-	for r := range dvv.vv {
+	result = append(result, dvv.Dot.Replica)
+	for r := range dvv.Clock {
 		result = append(result, r)
 	}
 	return result
 }
 
-func ids(dvvs []DVV) []string {
+func ids(dvvs []*pb.DVV) []string {
 	var result []string
 	for _, dvv := range dvvs {
-		result = append(result, dvv.ids()...)
+		result = append(result, dvvIDs(dvv)...)
 	}
 	return result
 }
 
-func (dvv DVV) ceil(r string) int32 {
-	if dvv.d.r == r {
-		return max(dvv.d.n, dvv.vv[r])
+func dvvCeil(dvv *pb.DVV, r string) int32 {
+	dot := dvv.Dot
+	if dot != nil && dot.Replica == r {
+		return max(dot.N, dvv.Clock[r])
 	}
-	return dvv.vv[r]
+	return dvv.Clock[r]
 }
 
-func ceil(dvvs []DVV, r string) int32 {
+func ceil(dvvs []*pb.DVV, r string) int32 {
 	m := int32(0)
 	for _, dvv := range dvvs {
-		m = max(m, dvv.ceil(r))
+		m = max(m, dvvCeil(dvv, r))
 	}
 	return m
 }
 
-func update(S []DVV, S_r []DVV, r string) DVV {
-	result := DVV{
-		d: dot{
-			r: r,
-			n: ceil(S_r, r) + 1,
+func Update(S []*pb.DVV, S_r []*pb.DVV, r string) *pb.DVV {
+	result := &pb.DVV{
+		Dot: &pb.Dot{
+			Replica: r,
+			N: ceil(S_r, r) + 1,
 		},
-		vv: make(map[string]int32),
+		Clock: make(map[string]int32),
 	}
 	for _, i := range ids(S) {
-		result.vv[i] = ceil(S, i)
+		result.Clock[i] = ceil(S, i)
 	}
 	return result
 }

@@ -2,6 +2,7 @@ package state
 
 import (
 	"fmt"
+	pb "kvs/proto"
 	"kvs/util"
 )
 
@@ -14,50 +15,45 @@ const (
 	CC Ord = 2
 )
 
-type GCounter struct {
-	replica util.Replica
-	vec     map[string]int64
-}
-
-func NewGCounter(replica util.Replica) GCounter {
+func NewGCounter(replica string) *pb.GCounter {
 	vec := make(map[string]int64)
-	vec[replica.String()] = 0
-	return GCounter{
-		replica: replica,
-		vec:     vec,
+	vec[replica] = 0
+	return &pb.GCounter{
+		Replica: replica,
+		Vec:     vec,
 	}
 }
 
-func (g *GCounter) Increment() {
-	id := g.replica.String()
-	v, ok := g.vec[id]
+func Increment(g *pb.GCounter) {
+	id := g.Replica
+	v, ok := g.Vec[id]
 	if !ok {
-		g.vec[id] = 1
+		g.Vec[id] = 1
 		return
 	}
-	g.vec[id] = v + 1
+	g.Vec[id] = v + 1
 }
 
-func (g *GCounter) Value() int {
+func Value(g *pb.GCounter) int {
 	sum := 0
-	for _, count := range g.vec {
+	for _, count := range g.Vec {
 		sum += int(count)
 	}
 	return sum
 }
 
-func (g *GCounter) SafeGet(r string) int64 {
-	v, ok := g.vec[r]
+func SafeGet(g *pb.GCounter, r string) int64 {
+	v, ok := g.Vec[r]
 	if !ok {
 		return 0
 	}
 	return v
 }
 
-func (g *GCounter) Compare(o GCounter) Ord {
+func Compare(g1, g2 *pb.GCounter) Ord {
 	ord := EQ
-	for k, va := range g.vec {
-		vb := o.SafeGet(k)
+	for k, va := range g1.Vec {
+		vb := SafeGet(g2, k)
 		switch {
 		case ord == EQ && va > vb:
 			ord = GT
@@ -72,21 +68,21 @@ func (g *GCounter) Compare(o GCounter) Ord {
 	return ord
 }
 
-func (g GCounter) String() string {
-	return fmt.Sprintf("%v", g.vec)
+func String(g *pb.GCounter) string {
+	return fmt.Sprintf("%v", g.Vec)
 }
 
-func (g *GCounter) Merge(ovec map[string]int64) {
-	for k, vo := range ovec {
-		v := g.SafeGet(k)
-		g.vec[k] = util.Max(v, vo)
+func Merge(g1, g2 *pb.GCounter) {
+	for k, vo := range g2.Vec {
+		v := SafeGet(g1, k)
+		g1.Vec[k] = util.Max(v, vo)
 	}
 }
 
-func (g *GCounter) Copy() GCounter {
-	cpy := NewGCounter(g.replica)
-	for k, v := range g.vec {
-		cpy.vec[k] = v
+func Copy(g *pb.GCounter) *pb.GCounter {
+	cpy := NewGCounter(g.Replica)
+	for k, v := range g.Vec {
+		cpy.Vec[k] = v
 	}
 	return cpy
 }

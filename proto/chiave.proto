@@ -7,15 +7,38 @@ option go_package = "kvs/proto/chiave";
 package chiave;
 
 service Chiave {
-  rpc Get(Key) returns (GetResponse) {}
-  rpc Increment(Key) returns (google.protobuf.Empty) {}
-  rpc Decrement(Key) returns (google.protobuf.Empty) {}
+  rpc Get(Request) returns (GetResponse) {}
+  rpc Increment(Request) returns (Response) {}
+  rpc Decrement(Request) returns (Response) {}
+  rpc Add(Request) returns (Response) {}
   rpc ProcessEvent(Event) returns (google.protobuf.Empty) {}
 }
 
-message Key {
-  string id = 1;
+message Response {
+  repeated DVV context = 1;
+}
+
+message Request {
+  string key = 1;
   int32 worker_id = 2;
+  repeated DVV context = 3;
+  repeated string args = 4;
+}
+
+message GetResponse {
+  string value = 1;
+  bool exists = 2;
+  repeated DVV context = 3;
+}
+
+message DVV {
+  map<string, int32> clock = 1;
+  Dot dot = 2;
+}
+
+message Dot {
+  string replica = 1;
+  int32 n = 2;
 }
 
 enum DT {
@@ -28,10 +51,12 @@ message Event {
   int32 dest = 2;
   string key = 3;
   DT datatype = 4;
+  repeated DVV context = 5;
   oneof data {
-    OpCounter op_counter = 5;
-    StateCounter state_counter = 6;
-    DeltaCounter delta_counter = 7;
+    OpCounter op_counter = 6;
+    StateCounter state_counter = 7;
+    DeltaCounter delta_counter = 8;
+    StateSet state_set = 10;
   }
 }
 
@@ -40,8 +65,8 @@ message OpCounter {
 }
 
 message StateCounter {
-  map<string, int64> pos = 1;
-  map<string, int64> neg = 2;
+  GCounter pos = 1;
+  GCounter neg = 2;
 }
 
 message DeltaCounter {
@@ -49,7 +74,12 @@ message DeltaCounter {
   map<string, int64> neg = 2;
 }
 
-message GetResponse {
-  string value = 1;
-  bool exists = 2;
+message StateSet {
+  map<string, GCounter> add = 1;
+  map<string, GCounter> rem = 2;
+}
+
+message GCounter {
+  map<string, int64> vec = 1;
+  string replica = 2;
 }

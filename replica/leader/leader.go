@@ -87,36 +87,56 @@ func (l *leader[_]) ProcessEvent(ctx context.Context, in *pb.Event) (*emptypb.Em
 	return &emptypb.Empty{}, nil
 }
 
-func (l *leader[_]) Get(ctx context.Context, in *pb.Key) (*pb.GetResponse, error) {
+func (l *leader[_]) Get(ctx context.Context, in *pb.Request) (*pb.GetResponse, error) {
 	req := worker.ClientRequest{
-		Key:       in.Id,
+		Key:       in.Key,
 		Operation: worker.Get,
 		Response:  make(chan worker.Response, 1),
 	}
 	l.workers[in.WorkerId].PutRequest(req)
 	r := <-req.Response
 	return &pb.GetResponse{
-		Value:  r.Value,
-		Exists: r.Exists,
+		Value:   r.Value,
+		Exists:  r.Exists,
+		Context: r.Context,
 	}, nil
 }
 
-func (l *leader[_]) Increment(ctx context.Context, in *pb.Key) (*emptypb.Empty, error) {
+func (l *leader[_]) Increment(ctx context.Context, in *pb.Request) (*pb.Response, error) {
 	req := worker.ClientRequest{
-		Key:       in.Id,
+		Key:       in.Key,
 		Operation: worker.Increment,
+		Context:   in.Context,
+		Response:  make(chan worker.Response, 1),
 	}
 	l.workers[in.WorkerId].PutRequest(req)
-	return &emptypb.Empty{}, nil
+	r := <-req.Response
+	return &pb.Response{Context: r.Context}, nil
 }
 
-func (l *leader[_]) Decrement(ctx context.Context, in *pb.Key) (*emptypb.Empty, error) {
+func (l *leader[_]) Decrement(ctx context.Context, in *pb.Request) (*pb.Response, error) {
 	req := worker.ClientRequest{
-		Key:       in.Id,
+		Key:       in.Key,
 		Operation: worker.Decrement,
+		Context:   in.Context,
+		Response:  make(chan worker.Response, 1),
 	}
 	l.workers[in.WorkerId].PutRequest(req)
-	return &emptypb.Empty{}, nil
+	r := <-req.Response
+	return &pb.Response{Context: r.Context}, nil
+}
+
+func (l *leader[_]) Add(ctx context.Context, in *pb.Request) (*pb.Response, error) {
+	req := worker.ClientRequest{
+		Key:       in.Key,
+		Operation: worker.AddSet,
+		Context:   in.Context,
+		Response:  make(chan worker.Response, 1),
+		Params:    in.Args,
+	}
+	l.workers[in.WorkerId].PutRequest(req)
+	r := <-req.Response
+	return &pb.Response{Context: r.Context}, nil
 }
 
 func main() {

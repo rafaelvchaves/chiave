@@ -16,10 +16,30 @@ const (
 	RPCTimeout = 5 * time.Second
 )
 
+type Key interface {
+	string() string
+}
+
+type ChiaveCounter string
+
+func (c ChiaveCounter) string() string {
+	return string(c)
+}
+
+type ChiaveSet string
+
+func (c ChiaveSet) string() string {
+	return string(c)
+}
+
+type ChiaveRegister string
+
 type Proxy struct {
 	connections map[string]*grpc.ClientConn
 	hashRing    *consistent.Consistent
 	repFactor   int
+	context     []*pb.DVV
+	// id uuid
 }
 
 func NewProxy() *Proxy {
@@ -42,8 +62,9 @@ func (p *Proxy) ownersOf(key string) ([]consistent.Member, error) {
 	return owners, nil
 }
 
-func (p *Proxy) Increment(key string) error {
-	owners, err := p.ownersOf(key)
+func (p *Proxy) Increment(key ChiaveCounter) error {
+	fmt.Printf("client context: %v\n", p.context)
+	owners, err := p.ownersOf(key.string())
 	if err != nil {
 		return err
 	}
@@ -52,20 +73,22 @@ func (p *Proxy) Increment(key string) error {
 		client := pb.NewChiaveClient(p.connections[r.Addr])
 		ctx, cancel := context.WithTimeout(context.Background(), RPCTimeout)
 		defer cancel()
-		_, err := client.Increment(ctx, &pb.Key{
-			Id:       key,
+		res, err := client.Increment(ctx, &pb.Request{
+			Key:      key.string(),
 			WorkerId: int32(r.WorkerID),
+			Context:  p.context,
 		})
 		if err == nil {
+			p.context = util.Sync(p.context, res.Context)
 			return nil
 		}
-		fmt.Println(err)
 	}
 	return fmt.Errorf("failed to reach owners of key %q", key)
 }
 
-func (p *Proxy) Decrement(key string) error {
-	owners, err := p.ownersOf(key)
+func (p *Proxy) Decrement(key ChiaveCounter) error {
+	fmt.Printf("client context: %v\n", p.context)
+	owners, err := p.ownersOf(key.string())
 	if err != nil {
 		return err
 	}
@@ -74,19 +97,23 @@ func (p *Proxy) Decrement(key string) error {
 		client := pb.NewChiaveClient(p.connections[r.Addr])
 		ctx, cancel := context.WithTimeout(context.Background(), RPCTimeout)
 		defer cancel()
-		_, err := client.Decrement(ctx, &pb.Key{
-			Id:       key,
+		res, err := client.Decrement(ctx, &pb.Request{
+			Key:      key.string(),
 			WorkerId: int32(r.WorkerID),
+			Context:  p.context,
 		})
 		if err == nil {
+			p.context = util.Sync(p.context, res.Context)
 			return nil
 		}
 	}
 	return fmt.Errorf("failed to reach owners of key %q", key)
 }
 
-func (p *Proxy) Get(key string) (string, error) {
-	owners, err := p.ownersOf(key)
+func (p *Proxy) Get(key Key) (string, error) {
+	fmt.Printf("client context: %v\n", p.context)
+	k := key.string()
+	owners, err := p.ownersOf(k)
 	if err != nil {
 		return "", err
 	}
@@ -95,15 +122,41 @@ func (p *Proxy) Get(key string) (string, error) {
 		client := pb.NewChiaveClient(p.connections[r.Addr])
 		ctx, cancel := context.WithTimeout(context.Background(), RPCTimeout)
 		defer cancel()
-		res, err := client.Get(ctx, &pb.Key{
-			Id:       key,
+		res, err := client.Get(ctx, &pb.Request{
+			Key:      k,
 			WorkerId: int32(r.WorkerID),
 		})
 		if err == nil {
+			p.context = util.Sync(p.context, res.Context)
 			return res.Value, nil
 		}
 	}
 	return "", fmt.Errorf("failed to reach owners of key %q", key)
+}
+
+func (p *Proxy) AddSet(key ChiaveSet, element string) error {
+	fmt.Printf("client context: %v\n", p.context)
+	owners, err := p.ownersOf(key.string())
+	if err != nil {
+		return err
+	}
+	for _, owner := range owners {
+		r := owner.(util.Replica)
+		client := pb.NewChiaveClient(p.connections[r.Addr])
+		ctx, cancel := context.WithTimeout(context.Background(), RPCTimeout)
+		defer cancel()
+		res, err := client.Add(ctx, &pb.Request{
+			Key:      key.string(),
+			WorkerId: int32(r.WorkerID),
+			Context:  p.context,
+			Args:     []string{element},
+		})
+		if err == nil {
+			p.context = util.Sync(p.context, res.Context)
+			return nil
+		}
+	}
+	return fmt.Errorf("failed to reach owners of key %q", key)
 }
 
 func (p *Proxy) Cleanup() error {

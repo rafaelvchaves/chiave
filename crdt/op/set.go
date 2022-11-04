@@ -3,25 +3,52 @@ package op
 import (
 	pb "kvs/proto"
 	"kvs/util"
+	"strings"
+
+	"github.com/emirpasic/gods/sets/treeset"
 )
 
+type Ord int
+
+type Context interface {
+	Compare(Context) Ord
+	Merge(Context) Context
+}
+
 type Set struct {
-	replica util.Replica
-	s       util.Set[util.Pair[string, tag]]
+	replica  util.Replica
+	add, rem *treeset.Set
+}
+
+type element struct {
+	e   string
+	ctx Context
+}
+
+func compare(e1, e2 any) int {
+	return strings.Compare(e1.(element).e, e2.(element).e)
 }
 
 func NewSet(r util.Replica) *Set {
 	return &Set{
 		replica: r,
-		s:       util.NewSet[util.Pair[string, tag]](),
+		add:     treeset.NewWith(compare),
+		rem:     treeset.NewWith(compare),
 	}
 }
 
-func (s *Set) Add(e string)                 {}
-func (s *Set) Remove(e string)              {}
-func (s *Set) Lookup(e string) bool         { return false }
-func (s *Set) GetEvent() *pb.Event           { return &pb.Event{} }
-func (s *Set) PersistEvent(event *pb.Event) {}
+func (s *Set) Add(e string, ctx Context) {
+	s.add.Add(element{
+		e:   e,
+		ctx: ctx,
+	})
+}
+func (s *Set) Remove(e string, ctx Context) {
+	
+}
+func (s *Set) Lookup(e string, ctx Context) bool { return false }
+func (s *Set) GetEvent() *pb.Event               { return &pb.Event{} }
+func (s *Set) PersistEvent(event *pb.Event)      {}
 
 func (s *Set) String() string { return "" }
 

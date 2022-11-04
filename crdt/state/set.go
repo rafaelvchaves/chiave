@@ -1,6 +1,7 @@
 package state
 
 import (
+	"fmt"
 	"kvs/crdt"
 	pb "kvs/proto"
 	"kvs/util"
@@ -8,8 +9,8 @@ import (
 
 type Set struct {
 	replica util.Replica
-	add     map[string]GCounter
-	rem     map[string]GCounter
+	add     map[string]*pb.GCounter
+	rem     map[string]*pb.GCounter
 }
 
 var _ crdt.Set = &Set{}
@@ -17,8 +18,8 @@ var _ crdt.Set = &Set{}
 func NewSet(replica util.Replica) *Set {
 	return &Set{
 		replica: replica,
-		add:     make(map[string]GCounter),
-		rem:     make(map[string]GCounter),
+		add:     make(map[string]*pb.GCounter),
+		rem:     make(map[string]*pb.GCounter),
 	}
 }
 
@@ -36,7 +37,7 @@ func (s *Set) Value() map[string]struct{} {
 		// if the element exists in the remove set
 		// with a strictly greater timestamp,
 		// remove it from the resulting set.
-		if va, ok := s.add[k]; ok && va.Compare(vr) == LT {
+		if va, ok := s.add[k]; ok && Compare(va, vr) == LT {
 			delete(set, k)
 		}
 	}
@@ -45,74 +46,112 @@ func (s *Set) Value() map[string]struct{} {
 
 func (s *Set) Add(e string) {
 	if va, ok := s.add[e]; ok {
-		va.Increment()
+		Increment(va)
 		delete(s.rem, e)
 		return
 	}
 	if vr, ok := s.rem[e]; ok {
 		s.add[e] = vr
-		vr.Increment()
+		Increment(vr)
 		delete(s.rem, e)
 		return
 	}
-	vec := NewGCounter(s.replica)
-	vec.Increment()
+	vec := NewGCounter(s.replica.String())
+	Increment(vec)
 	s.add[e] = vec
 }
 
 func (s *Set) Remove(e string) {
 	if va, ok := s.add[e]; ok {
 		s.rem[e] = va
-		va.Increment()
+		Increment(va)
 		delete(s.add, e)
 		return
 	}
 	if vr, ok := s.rem[e]; ok {
 		s.add[e] = vr
-		vr.Increment()
+		Increment(vr)
 		delete(s.add, e)
 		return
 	}
-	vec := NewGCounter(s.replica)
-	vec.Increment()
+	vec := NewGCounter(s.replica.String())
+	Increment(vec)
 	s.rem[e] = vec
 }
 
-func (s *Set) Merge(add, rem map[string]map[string]int64) {
+func (s *Set) Merge(add, rem map[string]*pb.GCounter) {
 	for k, v := range add {
 		vo, ok := s.add[k]
 		if ok {
-			vo.Merge(OfMap(v))
+			Merge(vo, v)
 			continue
 		}
-		s.add[k] = OfMap(v)
+		s.add[k] = v
 	}
 	for k, v := range rem {
 		vo, ok := s.rem[k]
 		if ok {
-			vo.Merge(OfMap(v))
+			Merge(vo, v)
 			continue
 		}
-		s.rem[k] = OfMap(v)
+		s.rem[k] = v
 	}
 	for k, vr := range s.rem {
 		va, ok := s.add[k]
-		if ok && vr.Compare(va) == GT {
+		if ok && Compare(vr, va) == GT {
 			delete(s.add, k)
 		}
 	}
 	for k, va := range s.add {
 		vr, ok := s.add[k]
-		if ok && va.Compare(vr) == GT {
+		if ok && Compare(va, vr) == GT {
 			delete(s.rem, k)
 		}
 	}
 }
 
 func (s *Set) GetEvent() *pb.Event {
-	return &pb.Event{}
+	return &pb.Event{
+		Source:   s.replica.String(),
+		Datatype: pb.DT_Set,
+		Data: &pb.Event_StateSet{
+			StateSet: &pb.StateSet{
+				Add: copy(s.add),
+				Rem: copy(s.rem),
+			},
+		},
+	}
 }
 
-func (s *Set) PersistEvent(event *pb.Event) {}
+func copy(m map[string]*pb.GCounter) map[string]*pb.GCounter {
+	result := make(map[string]*pb.GCounter)
+	for k, v := range m {
+		result[k] = Copy(v)
+	}
+	return result
+}
 
-func (s *Set) String() string { return "" }
+func (s *Set) PersistEvent(event *pb.Event) {
+	fmt.Printf("%q calling persistevent, current state = %s\n", s.replica, s.String())
+	ss := event.GetStateSet()
+	if ss == nil {
+		fmt.Println("warning: nil state set encountered in PersistEvent")
+		return
+	}
+	s.Merge(ss.Add, ss.Rem)
+	fmt.Printf("%q state now = %s\n", s.replica, s.String())
+}
+
+func (s *Set) String() string {
+	set := s.Value()
+	str := "{"
+	i := 0
+	for e := range set {
+		i++
+		str += e
+		if i < len(set) {
+			str += ","
+		}
+	}
+	return str + "}"
+}

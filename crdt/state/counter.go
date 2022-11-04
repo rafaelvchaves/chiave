@@ -8,45 +8,38 @@ import (
 
 type Counter struct {
 	replica util.Replica
-	pos     GCounter
-	neg     GCounter
+	pos     *pb.GCounter
+	neg     *pb.GCounter
 }
 
 func NewCounter(replica util.Replica) *Counter {
 	return &Counter{
 		replica: replica,
-		pos:     NewGCounter(replica),
-		neg:     NewGCounter(replica),
+		pos:     NewGCounter(replica.String()),
+		neg:     NewGCounter(replica.String()),
 	}
 }
 
 func (c *Counter) Value() int {
-	return c.pos.Value() - c.neg.Value()
+	return Value(c.pos) - Value(c.neg)
 }
 
 func (c *Counter) Increment() {
-	c.pos.Increment()
+	Increment(c.pos)
 }
 
 func (c *Counter) Decrement() {
-	c.neg.Increment()
+	Increment(c.neg)
 }
 
 func (c Counter) String() string {
 	return fmt.Sprintf("%d", c.Value())
 }
 
-func (c *Counter) Merge(o Counter) {
-	fmt.Println(c.String())
-	fmt.Println(o.String())
-	c.pos.Merge(o.pos.vec)
-	c.neg.Merge(o.neg.vec)
-}
-
 func (c *Counter) Copy() Counter {
 	cpy := NewCounter(c.replica)
-	cpy.pos = c.pos.Copy()
-	cpy.neg = c.neg.Copy()
+	cpy.pos = Copy(c.pos)
+	cpy.neg = Copy(c.neg)
 	return *cpy
 }
 
@@ -56,8 +49,8 @@ func (c *Counter) GetEvent() *pb.Event {
 		Datatype: pb.DT_Counter,
 		Data: &pb.Event_StateCounter{
 			StateCounter: &pb.StateCounter{
-				Pos: c.pos.Copy().vec,
-				Neg: c.neg.Copy().vec,
+				Pos: Copy(c.pos),
+				Neg: Copy(c.neg),
 			},
 		},
 	}
@@ -69,6 +62,6 @@ func (s *Counter) PersistEvent(event *pb.Event) {
 		fmt.Println("warning: nil state counter encountered in PersistEvent")
 		return
 	}
-	s.pos.Merge(sc.Pos)
-	s.neg.Merge(sc.Neg)
+	Merge(s.pos, sc.Pos)
+	Merge(s.neg, sc.Neg)
 }
