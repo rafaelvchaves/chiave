@@ -111,7 +111,6 @@ func (p *Proxy) Decrement(key ChiaveCounter) error {
 }
 
 func (p *Proxy) Get(key Key) (string, error) {
-	fmt.Printf("client context: %v\n", p.context)
 	k := key.string()
 	owners, err := p.ownersOf(k)
 	if err != nil {
@@ -145,7 +144,7 @@ func (p *Proxy) AddSet(key ChiaveSet, element string) error {
 		client := pb.NewChiaveClient(p.connections[r.Addr])
 		ctx, cancel := context.WithTimeout(context.Background(), RPCTimeout)
 		defer cancel()
-		res, err := client.Add(ctx, &pb.Request{
+		res, err := client.AddSet(ctx, &pb.Request{
 			Key:      key.string(),
 			WorkerId: int32(r.WorkerID),
 			Context:  p.context,

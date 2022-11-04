@@ -126,7 +126,7 @@ func (l *leader[_]) Decrement(ctx context.Context, in *pb.Request) (*pb.Response
 	return &pb.Response{Context: r.Context}, nil
 }
 
-func (l *leader[_]) Add(ctx context.Context, in *pb.Request) (*pb.Response, error) {
+func (l *leader[_]) AddSet(ctx context.Context, in *pb.Request) (*pb.Response, error) {
 	req := worker.ClientRequest{
 		Key:       in.Key,
 		Operation: worker.AddSet,

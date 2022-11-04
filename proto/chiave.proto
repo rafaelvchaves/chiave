@@ -10,7 +10,8 @@ service Chiave {
   rpc Get(Request) returns (GetResponse) {}
   rpc Increment(Request) returns (Response) {}
   rpc Decrement(Request) returns (Response) {}
-  rpc Add(Request) returns (Response) {}
+  rpc AddSet(Request) returns (Response) {}
+  rpc RemoveSet(Request) returns (Response) {}
   rpc ProcessEvent(Event) returns (google.protobuf.Empty) {}
 }
 

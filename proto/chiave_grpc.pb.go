@@ -26,7 +26,8 @@ type ChiaveClient interface {
 	Get(ctx context.Context, in *Request, opts ...grpc.CallOption) (*GetResponse, error)
 	Increment(ctx context.Context, in *Request, opts ...grpc.CallOption) (*Response, error)
 	Decrement(ctx context.Context, in *Request, opts ...grpc.CallOption) (*Response, error)
-	Add(ctx context.Context, in *Request, opts ...grpc.CallOption) (*Response, error)
+	AddSet(ctx context.Context, in *Request, opts ...grpc.CallOption) (*Response, error)
+	RemoveSet(ctx context.Context, in *Request, opts ...grpc.CallOption) (*Response, error)
 	ProcessEvent(ctx context.Context, in *Event, opts ...grpc.CallOption) (*emptypb.Empty, error)
 }
 
@@ -65,9 +66,18 @@ func (c *chiaveClient) Decrement(ctx context.Context, in *Request, opts ...grpc.
 	return out, nil
 }
 
-func (c *chiaveClient) Add(ctx context.Context, in *Request, opts ...grpc.CallOption) (*Response, error) {
+func (c *chiaveClient) AddSet(ctx context.Context, in *Request, opts ...grpc.CallOption) (*Response, error) {
 	out := new(Response)
-	err := c.cc.Invoke(ctx, "/chiave.Chiave/Add", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/chiave.Chiave/AddSet", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *chiaveClient) RemoveSet(ctx context.Context, in *Request, opts ...grpc.CallOption) (*Response, error) {
+	out := new(Response)
+	err := c.cc.Invoke(ctx, "/chiave.Chiave/RemoveSet", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -90,7 +100,8 @@ type ChiaveServer interface {
 	Get(context.Context, *Request) (*GetResponse, error)
 	Increment(context.Context, *Request) (*Response, error)
 	Decrement(context.Context, *Request) (*Response, error)
-	Add(context.Context, *Request) (*Response, error)
+	AddSet(context.Context, *Request) (*Response, error)
+	RemoveSet(context.Context, *Request) (*Response, error)
 	ProcessEvent(context.Context, *Event) (*emptypb.Empty, error)
 	mustEmbedUnimplementedChiaveServer()
 }
@@ -108,8 +119,11 @@ func (UnimplementedChiaveServer) Increment(context.Context, *Request) (*Response
 func (UnimplementedChiaveServer) Decrement(context.Context, *Request) (*Response, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Decrement not implemented")
 }
-func (UnimplementedChiaveServer) Add(context.Context, *Request) (*Response, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method Add not implemented")
+func (UnimplementedChiaveServer) AddSet(context.Context, *Request) (*Response, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method AddSet not implemented")
+}
+func (UnimplementedChiaveServer) RemoveSet(context.Context, *Request) (*Response, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method RemoveSet not implemented")
 }
 func (UnimplementedChiaveServer) ProcessEvent(context.Context, *Event) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ProcessEvent not implemented")
@@ -181,20 +195,38 @@ func _Chiave_Decrement_Handler(srv interface{}, ctx context.Context, dec func(in
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Chiave_Add_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _Chiave_AddSet_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(Request)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(ChiaveServer).Add(ctx, in)
+		return srv.(ChiaveServer).AddSet(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/chiave.Chiave/Add",
+		FullMethod: "/chiave.Chiave/AddSet",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ChiaveServer).Add(ctx, req.(*Request))
+		return srv.(ChiaveServer).AddSet(ctx, req.(*Request))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Chiave_RemoveSet_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Request)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ChiaveServer).RemoveSet(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/chiave.Chiave/RemoveSet",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ChiaveServer).RemoveSet(ctx, req.(*Request))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -237,8 +269,12 @@ var Chiave_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _Chiave_Decrement_Handler,
 		},
 		{
-			MethodName: "Add",
-			Handler:    _Chiave_Add_Handler,
+			MethodName: "AddSet",
+			Handler:    _Chiave_AddSet_Handler,
+		},
+		{
+			MethodName: "RemoveSet",
+			Handler:    _Chiave_RemoveSet_Handler,
 		},
 		{
 			MethodName: "ProcessEvent",

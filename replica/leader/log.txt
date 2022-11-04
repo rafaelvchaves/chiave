@@ -1,13 +1,9 @@
-[INFO]	2022/11/04 17:44:00 replica localhost:4747,0 handling addset on key "key2"
-[INFO]	2022/11/04 17:44:00 worker 0 context = (0:1, {}), len = 1
-[INFO]	2022/11/04 17:44:00 replica localhost:4747,1 handling addset on key "key2"
-[INFO]	2022/11/04 17:44:00 worker 1 context = (1:1, {0:1}), len = 1
-[INFO]	2022/11/04 17:44:00 replica localhost:4747,1 handling get on key "key2"
-[INFO]	2022/11/04 17:44:00 worker 0 is sending &{add:{key:"a" value:{vec:{key:"localhost:4747,0" value:1} replica:"localhost:4747,0"}}} to worker 1
-[INFO]	2022/11/04 17:44:00 worker 1 is sending &{add:{key:"b" value:{vec:{key:"localhost:4747,1" value:1} replica:"localhost:4747,1"}}} to worker 0
-[INFO]	2022/11/04 17:44:00 worker 0 is sending &{add:{key:"a" value:{vec:{key:"localhost:4747,0" value:1} replica:"localhost:4747,0"}}} to worker 2
-[INFO]	2022/11/04 17:44:00 worker 1 is sending &{add:{key:"b" value:{vec:{key:"localhost:4747,1" value:1} replica:"localhost:4747,1"}}} to worker 2
-[INFO]	2022/11/04 17:44:00 worker (localhost:4747, 2) received ("key2", &{StateSet:add:{key:"a" value:{vec:{key:"localhost:4747,0" value:1} replica:"localhost:4747,0"}}}) from localhost:4747,0
-[INFO]	2022/11/04 17:44:00 worker (localhost:4747, 1) received ("key2", &{StateSet:add:{key:"a" value:{vec:{key:"localhost:4747,0" value:1} replica:"localhost:4747,0"}}}) from localhost:4747,0
-[INFO]	2022/11/04 17:44:00 worker (localhost:4747, 0) received ("key2", &{StateSet:add:{key:"b" value:{vec:{key:"localhost:4747,1" value:1} replica:"localhost:4747,1"}}}) from localhost:4747,1
-[INFO]	2022/11/04 17:44:00 worker (localhost:4747, 2) received ("key2", &{StateSet:add:{key:"b" value:{vec:{key:"localhost:4747,1" value:1} replica:"localhost:4747,1"}}}) from localhost:4747,1
+[INFO]	2022/11/04 18:03:20 replica localhost:4747,1 handling addset on key "key2"
+[INFO]	2022/11/04 18:03:20 worker 1 context = (1:1, {}), len = 1
+[INFO]	2022/11/04 18:03:20 replica localhost:4747,1 handling addset on key "key2"
+[INFO]	2022/11/04 18:03:20 worker 1 context = (1:2, {1:1}), len = 1
+[INFO]	2022/11/04 18:03:20 replica localhost:4747,1 handling get on key "key2"
+[INFO]	2022/11/04 18:03:20 worker 1 is sending &{add:{key:"a"  value:{vec:{key:"localhost:4747,1"  value:1}  replica:"localhost:4747,1"}}  add:{key:"b"  value:{vec:{key:"localhost:4747,1"  value:1}  replica:"localhost:4747,1"}}} to worker 0
+[INFO]	2022/11/04 18:03:20 worker 1 is sending &{add:{key:"a"  value:{vec:{key:"localhost:4747,1"  value:1}  replica:"localhost:4747,1"}}  add:{key:"b"  value:{vec:{key:"localhost:4747,1"  value:1}  replica:"localhost:4747,1"}}} to worker 2
+[INFO]	2022/11/04 18:03:20 worker (localhost:4747, 0) received ("key2", &{StateSet:add:{key:"a"  value:{vec:{key:"localhost:4747,1"  value:1}  replica:"localhost:4747,1"}}  add:{key:"b"  value:{vec:{key:"localhost:4747,1"  value:1}  replica:"localhost:4747,1"}}}) from localhost:4747,1
+[INFO]	2022/11/04 18:03:20 worker (localhost:4747, 2) received ("key2", &{StateSet:add:{key:"a"  value:{vec:{key:"localhost:4747,1"  value:1}  replica:"localhost:4747,1"}}  add:{key:"b"  value:{vec:{key:"localhost:4747,1"  value:1}  replica:"localhost:4747,1"}}}) from localhost:4747,1
