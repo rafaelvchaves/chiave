@@ -7,6 +7,7 @@ require golang.org/x/exp v0.0.0-20221010202428-3a778c567f61
 require github.com/buraksezer/consistent v0.9.0
 
 require (
+	github.com/emirpasic/gods v1.18.1
 	github.com/leemcloughlin/gofarmhash v0.0.0-20160919192320-0a055c5b87a8
 	google.golang.org/grpc v1.50.0
 	google.golang.org/protobuf v1.27.1
