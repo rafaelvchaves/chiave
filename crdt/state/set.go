@@ -132,14 +132,12 @@ func copy(m map[string]*pb.GCounter) map[string]*pb.GCounter {
 }
 
 func (s *Set) PersistEvent(event *pb.Event) {
-	fmt.Printf("%q calling persistevent, current state = %s\n", s.replica, s.String())
 	ss := event.GetStateSet()
 	if ss == nil {
 		fmt.Println("warning: nil state set encountered in PersistEvent")
 		return
 	}
 	s.Merge(ss.Add, ss.Rem)
-	fmt.Printf("%q state now = %s\n", s.replica, s.String())
 }
 
 func (s *Set) String() string {
