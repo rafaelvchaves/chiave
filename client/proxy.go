@@ -72,13 +72,12 @@ func (p *Proxy) Increment(key ChiaveCounter) error {
 		client := pb.NewChiaveClient(p.connections[r.Addr])
 		ctx, cancel := context.WithTimeout(context.Background(), RPCTimeout)
 		defer cancel()
-		res, err := client.Increment(ctx, &pb.Request{
+		_, err := client.Increment(ctx, &pb.Request{
 			Key:      key.string(),
 			WorkerId: int32(r.WorkerID),
 			Context:  p.context,
 		})
 		if err == nil {
-			p.context = util.Sync(p.context, res.Context)
 			return nil
 		}
 	}
@@ -95,13 +94,12 @@ func (p *Proxy) Decrement(key ChiaveCounter) error {
 		client := pb.NewChiaveClient(p.connections[r.Addr])
 		ctx, cancel := context.WithTimeout(context.Background(), RPCTimeout)
 		defer cancel()
-		res, err := client.Decrement(ctx, &pb.Request{
+		_, err := client.Decrement(ctx, &pb.Request{
 			Key:      key.string(),
 			WorkerId: int32(r.WorkerID),
 			Context:  p.context,
 		})
 		if err == nil {
-			p.context = util.Sync(p.context, res.Context)
 			return nil
 		}
 	}
