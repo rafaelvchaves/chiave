@@ -35,6 +35,7 @@ message GetResponse {
 message DVV {
   map<string, int32> clock = 1;
   Dot dot = 2;
+  string sibling = 3; 
 }
 
 message Dot {
