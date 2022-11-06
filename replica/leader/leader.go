@@ -139,6 +139,19 @@ func (l *leader[_]) AddSet(ctx context.Context, in *pb.Request) (*pb.Response, e
 	return &pb.Response{Context: r.Context}, nil
 }
 
+func (l *leader[_]) RemoveSet(ctx context.Context, in *pb.Request) (*pb.Response, error) {
+	req := worker.ClientRequest{
+		Key:       in.Key,
+		Operation: worker.RemoveSet,
+		Context:   in.Context,
+		Response:  make(chan worker.Response, 1),
+		Params:    in.Args,
+	}
+	l.workers[in.WorkerId].PutRequest(req)
+	r := <-req.Response
+	return &pb.Response{Context: r.Context}, nil
+}
+
 func main() {
 	addr := flag.String("a", "localhost:4747", "ip address to start leader at")
 	flavor := flag.String("crdt", "op", "CRDT flavor (op, state, delta)")

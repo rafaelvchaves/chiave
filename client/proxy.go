@@ -63,7 +63,6 @@ func (p *Proxy) ownersOf(key string) ([]consistent.Member, error) {
 }
 
 func (p *Proxy) Increment(key ChiaveCounter) error {
-	fmt.Printf("client context: %v\n", p.context)
 	owners, err := p.ownersOf(key.string())
 	if err != nil {
 		return err
@@ -87,7 +86,6 @@ func (p *Proxy) Increment(key ChiaveCounter) error {
 }
 
 func (p *Proxy) Decrement(key ChiaveCounter) error {
-	fmt.Printf("client context: %v\n", p.context)
 	owners, err := p.ownersOf(key.string())
 	if err != nil {
 		return err
@@ -134,7 +132,6 @@ func (p *Proxy) Get(key Key) (string, error) {
 }
 
 func (p *Proxy) AddSet(key ChiaveSet, element string) error {
-	fmt.Printf("client context: %v\n", p.context)
 	owners, err := p.ownersOf(key.string())
 	if err != nil {
 		return err
@@ -145,6 +142,30 @@ func (p *Proxy) AddSet(key ChiaveSet, element string) error {
 		ctx, cancel := context.WithTimeout(context.Background(), RPCTimeout)
 		defer cancel()
 		res, err := client.AddSet(ctx, &pb.Request{
+			Key:      key.string(),
+			WorkerId: int32(r.WorkerID),
+			Context:  p.context,
+			Args:     []string{element},
+		})
+		if err == nil {
+			p.context = util.Sync(p.context, res.Context)
+			return nil
+		}
+	}
+	return fmt.Errorf("failed to reach owners of key %q", key)
+}
+
+func (p *Proxy) RemoveSet(key ChiaveSet, element string) error {
+	owners, err := p.ownersOf(key.string())
+	if err != nil {
+		return err
+	}
+	for _, owner := range owners {
+		r := owner.(util.Replica)
+		client := pb.NewChiaveClient(p.connections[r.Addr])
+		ctx, cancel := context.WithTimeout(context.Background(), RPCTimeout)
+		defer cancel()
+		res, err := client.RemoveSet(ctx, &pb.Request{
 			Key:      key.string(),
 			WorkerId: int32(r.WorkerID),
 			Context:  p.context,

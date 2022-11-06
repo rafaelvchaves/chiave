@@ -1,0 +1,9 @@
+[INFO]	13:31:56 worker 1 handling REMOVE([a]) on key "key2"
+[INFO]	13:31:56 incoming client context: 
+[INFO]	13:31:56 worker 1 context: , len = 0
+[INFO]	13:31:56 worker 1 handling ADD([a]) on key "key2"
+[INFO]	13:31:56 incoming client context: 
+[INFO]	13:31:56 worker 1 context: (1:1, {}), len = 1
+[INFO]	13:31:56 worker 0 received event from 1, context = (1:1, {})(1:2, {})
+[INFO]	13:31:56 worker 0 context: , len = 0
+[INFO]	13:31:56 worker 0 context: (1:1, {})(1:2, {}), len = 2

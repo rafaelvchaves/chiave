@@ -18,10 +18,10 @@ func NewLogger(filename string) (*Logger, error) {
 		return nil, err
 	}
 	l := Logger{}
-	l.iLogger = log.New(file, "[INFO]\t", log.Ldate|log.Ltime)
-	l.wLogger = log.New(file, "[WARNING]\t", log.Ldate|log.Ltime)
-	l.eLogger = log.New(file, "[ERROR]\t", log.Ldate|log.Ltime)
-	l.fLogger = log.New(file, "[FATAL]\t", log.Ldate|log.Ltime)
+	l.iLogger = log.New(file, "[INFO]\t", log.Ltime)
+	l.wLogger = log.New(file, "[WARNING]\t", log.Ltime)
+	l.eLogger = log.New(file, "[ERROR]\t", log.Ltime)
+	l.fLogger = log.New(file, "[FATAL]\t", log.Ltime)
 	return &l, nil
 }
 
