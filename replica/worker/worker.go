@@ -17,16 +17,6 @@ import (
 
 const RPCTimeout = 10 * time.Second
 
-type CRDTHandler[F crdt.Flavor] interface {
-	Propagate(*pb.Event)
-}
-
-type DeltaHandler struct {
-	deltas map[uint32]crdt.CRDT[crdt.Delta]
-	acks   map[uint32]int
-	c      int
-}
-
 type Worker[F crdt.Flavor] struct {
 	replica     util.Replica
 	generator   generator.Generator[F]
