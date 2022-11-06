@@ -7,18 +7,6 @@ import (
 	"golang.org/x/exp/constraints"
 )
 
-type dot struct {
-	r string
-	n int32
-}
-
-type OpType int
-
-type Operation struct {
-	OpType OpType
-	args   any
-}
-
 func displayMap(m map[string]int32) string {
 	str := "{"
 	i := 0
