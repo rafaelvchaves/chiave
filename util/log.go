@@ -10,10 +10,7 @@ type Logger struct {
 }
 
 func NewLogger(filename string) (*Logger, error) {
-	if err := os.Truncate(filename, 0); err != nil {
-		return nil, err
-	}
-	file, err := os.OpenFile(filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
+	file, err := os.OpenFile(filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0666)
 	if err != nil {
 		return nil, err
 	}
