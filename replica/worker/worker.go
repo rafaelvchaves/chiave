@@ -17,8 +17,14 @@ import (
 
 const RPCTimeout = 10 * time.Second
 
-type CRDTHandler interface {
-	Broadcast(*pb.Event)
+type CRDTHandler[F crdt.Flavor] interface {
+	Propagate(*pb.Event)
+}
+
+type DeltaHandler struct {
+	deltas map[uint32]crdt.CRDT[crdt.Delta]
+	acks   map[uint32]int
+	c      int
 }
 
 type Worker[F crdt.Flavor] struct {
@@ -41,7 +47,24 @@ const (
 	Increment
 	Decrement
 	AddSet
+	RemoveSet
 )
+
+func (o Operation) String() string {
+	switch o {
+	case Get:
+		return "GET"
+	case Increment:
+		return "INC"
+	case Decrement:
+		return "DEC"
+	case AddSet:
+		return "ADD"
+	case RemoveSet:
+		return "REMOVE"
+	}
+	return "UNKNOWN"
+}
 
 type ClientRequest struct {
 	Key       string
@@ -63,8 +86,8 @@ func New[F crdt.Flavor](replica util.Replica, generator generator.Generator[F], 
 		replica:     replica,
 		kvs:         NewCache[F](),
 		contexts:    make(map[string][]*pb.DVV),
-		requests:    make(chan ClientRequest, 10),
-		events:      make(chan *pb.Event, 10),
+		requests:    make(chan ClientRequest, 1000),
+		events:      make(chan *pb.Event, 1000),
 		hashRing:    util.GetHashRing(),
 		connections: util.GetConnections(),
 		cfg:         util.LoadConfig(),
@@ -81,7 +104,7 @@ func (w *Worker[F]) Get(key string) (string, bool) {
 }
 
 func (w *Worker[F]) Start() {
-	requestDeadline := 50 * time.Millisecond
+	requestDeadline := 75 * time.Millisecond
 	for {
 		// set of keys modified in this epoch
 		changeset := util.NewSet[string]()
@@ -106,7 +129,7 @@ func (w *Worker[F]) Start() {
 			}
 			e := v.GetEvent()
 			e.Key = key
-			e.Context = w.contexts[key]
+			// e.Context = w.contexts[key]
 			w.broadcast(e)
 			return true
 		})
@@ -115,10 +138,12 @@ func (w *Worker[F]) Start() {
 		for {
 			select {
 			case event := <-w.events:
-				w.logger.Infof("worker (%s, %d) received (%q, %+v) from %s\n", w.replica.Addr, w.replica.WorkerID, event.Key, event.Data, event.Source)
-				// w.logger.Infof("worker (%s, %d) context before = %+v", w.replica.Addr, w.replica.WorkerID, w.contexts[event.Key])
-				w.contexts[event.Key] = util.Sync(w.contexts[event.Key], event.Context)
-				// w.logger.Infof("worker (%s, %d) context after = %+v", w.replica.Addr, w.replica.WorkerID, w.contexts[event.Key])
+				// w.logger.Infof("")
+				wid := strings.Split(event.Source, ",")[1]
+				w.logger.Infof("worker %d received event from %s, context = %s\n", w.replica.WorkerID, wid, display(event.Context))
+				// w.logContext(event.Key)
+				// w.contexts[event.Key] = util.Sync(w.contexts[event.Key], event.Context)
+				// w.logContext(event.Key)
 				v := w.kvs.GetOrDefault(event.Key, w.generator.New(event.Datatype, w.replica))
 				v.PersistEvent(event)
 				w.kvs.Put(event.Key, v)
@@ -153,16 +178,21 @@ func display(context []*pb.DVV) string {
 }
 
 func (w *Worker[F]) logContext(key string) {
-	w.logger.Infof("worker %d context = %+v, len = %d", w.replica.WorkerID, display(w.contexts[key]), len(w.contexts[key]))
+	w.logger.Infof("worker %d context: %+v, len = %d", w.replica.WorkerID, display(w.contexts[key]), len(w.contexts[key]))
+}
+
+func (w *Worker[F]) logRequestHandle(key string, o Operation, args []string) {
+	w.logger.Infof("worker %d handling %s(%v) on key %q", w.replica.WorkerID, o.String(), args, key)
 }
 
 func (w *Worker[F]) process(r ClientRequest) {
+	w.logRequestHandle(r.Key, r.Operation, r.Params)
+	w.logger.Infof("incoming client context: %s", display(r.Context))
+	w.logContext(r.Key)
 	switch r.Operation {
 	case Increment:
-		w.logger.Infof("replica %s handling increment on key %q", w.replica.String(), r.Key)
-		u := util.Update(r.Context, w.contexts[r.Key], w.replica.String())
-		w.contexts[r.Key] = util.Sync(w.contexts[r.Key], []*pb.DVV{u})
-		w.logContext(r.Key)
+		// u := util.Update(r.Context, w.contexts[r.Key], w.replica.String())
+		// w.contexts[r.Key] = util.Sync(w.contexts[r.Key], []*pb.DVV{u})
 		v := w.kvs.GetOrDefault(r.Key, w.generator.New(pb.DT_Counter, w.replica))
 		counter, ok := v.(crdt.Counter)
 		if !ok {
@@ -174,10 +204,8 @@ func (w *Worker[F]) process(r ClientRequest) {
 			Context: w.contexts[r.Key],
 		}
 	case Decrement:
-		w.logger.Infof("replica %s handling decrement on key %q", w.replica.String(), r.Key)
-		u := util.Update(r.Context, w.contexts[r.Key], w.replica.String())
-		w.contexts[r.Key] = util.Sync(w.contexts[r.Key], []*pb.DVV{u})
-		w.logContext(r.Key)
+		// u := util.Update(r.Context, w.contexts[r.Key], w.replica.String())
+		// w.contexts[r.Key] = util.Sync(w.contexts[r.Key], []*pb.DVV{u})
 		v := w.kvs.GetOrDefault(r.Key, w.generator.New(pb.DT_Counter, w.replica))
 		counter, ok := v.(crdt.Counter)
 		if !ok {
@@ -189,7 +217,6 @@ func (w *Worker[F]) process(r ClientRequest) {
 			Context: w.contexts[r.Key],
 		}
 	case Get:
-		w.logger.Infof("replica %s handling get on key %q", w.replica.String(), r.Key)
 		var value string
 		v, ok := w.kvs.Get(r.Key)
 		if ok {
@@ -201,10 +228,11 @@ func (w *Worker[F]) process(r ClientRequest) {
 			Context: w.contexts[r.Key],
 		}
 	case AddSet:
-		w.logger.Infof("replica %s handling addset on key %q", w.replica.String(), r.Key)
-		u := util.Update(r.Context, w.contexts[r.Key], w.replica.String())
-		w.contexts[r.Key] = util.Sync(w.contexts[r.Key], []*pb.DVV{u})
-		w.logContext(r.Key)
+		// u := util.Update(r.Context, w.contexts[r.Key], w.replica.String())
+		// w.contexts[r.Key] = util.Sync(w.contexts[r.Key], []*pb.DVV{u})
+		// if len(w.contexts[r.Key]) > 1 {
+		// 	fmt.Println("conflicting: ", display(w.contexts[r.Key]))
+		// }
 		v := w.kvs.GetOrDefault(r.Key, w.generator.New(pb.DT_Set, w.replica))
 		set, ok := v.(crdt.Set)
 		if !ok {
@@ -215,8 +243,20 @@ func (w *Worker[F]) process(r ClientRequest) {
 		r.Response <- Response{
 			Context: w.contexts[r.Key],
 		}
+	case RemoveSet:
+		// u := util.Update(r.Context, w.contexts[r.Key], w.replica.String())
+		// w.contexts[r.Key] = util.Sync(w.contexts[r.Key], []*pb.DVV{u})
+		v := w.kvs.GetOrDefault(r.Key, w.generator.New(pb.DT_Set, w.replica))
+		set, ok := v.(crdt.Set)
+		if !ok {
+			return
+		}
+		set.Remove(r.Params[0])
+		w.kvs.Put(r.Key, v)
+		r.Response <- Response{
+			Context: w.contexts[r.Key],
+		}
 	}
-	// fmt.Printf("%s: %s\n", w.replica.String(), w.kvs.String())
 }
 
 func (w *Worker[F]) broadcast(event *pb.Event) {
@@ -233,7 +273,7 @@ func (w *Worker[F]) broadcast(event *pb.Event) {
 		client := pb.NewChiaveClient(w.connections[v.Addr])
 		ctx, cancel := context.WithTimeout(context.Background(), RPCTimeout)
 		defer cancel()
-		w.logger.Infof("worker %d is sending %v to worker %d", w.replica.WorkerID, event.Data, v.WorkerID)
+		// w.logger.Infof("worker %d is sending %v to worker %d", w.replica.WorkerID, event.Data, v.WorkerID)
 		_, err := client.ProcessEvent(ctx, event)
 		if err != nil {
 			w.logger.Errorf("ProcessEvent from %s to %s: %v", w.replica.String(), v.String(), err)
