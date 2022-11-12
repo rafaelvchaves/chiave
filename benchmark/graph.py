@@ -6,7 +6,7 @@ from matplotlib import rc
 rc('font',**{'family':'sans-serif','sans-serif':['DejaVu Sans'],'size':10})
 rc('mathtext',**{'default':'regular'})
 
-df = pd.read_csv('results.csv')
+df = pd.read_csv('results2.csv')
 df.sort_values(by='TP', inplace=True)
 plt.xlabel('throughput (operations per second)')
 plt.ylabel('95th percentile latency (microseconds)')
