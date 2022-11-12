@@ -76,8 +76,8 @@ func New[F crdt.Flavor](replica util.Replica, generator generator.Generator[F], 
 		replica:     replica,
 		kvs:         NewCache[F](),
 		contexts:    make(map[string][]*pb.DVV),
-		requests:    make(chan ClientRequest, 1000),
-		events:      make(chan *pb.Event, 1000),
+		requests:    make(chan ClientRequest, 10000),
+		events:      make(chan *pb.Event, 10000),
 		hashRing:    util.GetHashRing(),
 		connections: util.GetConnections(),
 		cfg:         util.LoadConfig(),
@@ -98,17 +98,18 @@ func (w *Worker[F]) Start() {
 	for {
 		// set of keys modified in this epoch
 		changeset := util.NewSet[string]()
+		timeout := time.After(requestDeadline)
 	reqLoop:
 		for {
 			// phase 1: receive client requests and convert to events
 			select {
+			case <-timeout:
+				break reqLoop
 			case req := <-w.requests:
 				w.process(req)
 				if req.Operation != Get {
 					changeset.Add(req.Key)
 				}
-			case <-time.After(requestDeadline):
-				break reqLoop
 			}
 		}
 		// phase 2: go through all affected keys and broadcast to other owners
@@ -124,6 +125,7 @@ func (w *Worker[F]) Start() {
 			return true
 		})
 
+		timeout = time.After(requestDeadline)
 	eventLoop:
 		for {
 			select {
@@ -137,7 +139,7 @@ func (w *Worker[F]) Start() {
 				v := w.kvs.GetOrDefault(event.Key, w.generator.New(event.Datatype, w.replica))
 				v.PersistEvent(event)
 				w.kvs.Put(event.Key, v)
-			case <-time.After(requestDeadline):
+			case <-timeout:
 				break eventLoop
 			}
 		}
