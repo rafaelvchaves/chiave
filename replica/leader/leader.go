@@ -107,11 +107,9 @@ func (l *leader[_]) Increment(ctx context.Context, in *pb.Request) (*pb.Response
 		Key:       in.Key,
 		Operation: worker.Increment,
 		Context:   in.Context,
-		Response:  make(chan worker.Response, 1),
 	}
 	l.workers[in.WorkerId].PutRequest(req)
-	r := <-req.Response
-	return &pb.Response{Context: r.Context}, nil
+	return &pb.Response{}, nil
 }
 
 func (l *leader[_]) Decrement(ctx context.Context, in *pb.Request) (*pb.Response, error) {
@@ -119,11 +117,9 @@ func (l *leader[_]) Decrement(ctx context.Context, in *pb.Request) (*pb.Response
 		Key:       in.Key,
 		Operation: worker.Decrement,
 		Context:   in.Context,
-		Response:  make(chan worker.Response, 1),
 	}
 	l.workers[in.WorkerId].PutRequest(req)
-	r := <-req.Response
-	return &pb.Response{Context: r.Context}, nil
+	return &pb.Response{}, nil
 }
 
 func (l *leader[_]) AddSet(ctx context.Context, in *pb.Request) (*pb.Response, error) {

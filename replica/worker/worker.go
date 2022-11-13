@@ -94,7 +94,7 @@ func (w *Worker[F]) Get(key string) (string, bool) {
 }
 
 func (w *Worker[F]) Start() {
-	requestDeadline := 75 * time.Millisecond
+	requestDeadline := 50 * time.Millisecond
 	for {
 		// set of keys modified in this epoch
 		changeset := util.NewSet[string]()
@@ -183,8 +183,6 @@ func (w *Worker[F]) process(r ClientRequest) {
 	w.logContext(r.Key)
 	switch r.Operation {
 	case Increment:
-		// u := util.Update(r.Context, w.contexts[r.Key], w.replica.String())
-		// w.contexts[r.Key] = util.Sync(w.contexts[r.Key], []*pb.DVV{u})
 		v := w.kvs.GetOrDefault(r.Key, w.generator.New(pb.DT_Counter, w.replica))
 		counter, ok := v.(crdt.Counter)
 		if !ok {
@@ -192,12 +190,7 @@ func (w *Worker[F]) process(r ClientRequest) {
 		}
 		counter.Increment()
 		w.kvs.Put(r.Key, v)
-		r.Response <- Response{
-			Context: w.contexts[r.Key],
-		}
 	case Decrement:
-		// u := util.Update(r.Context, w.contexts[r.Key], w.replica.String())
-		// w.contexts[r.Key] = util.Sync(w.contexts[r.Key], []*pb.DVV{u})
 		v := w.kvs.GetOrDefault(r.Key, w.generator.New(pb.DT_Counter, w.replica))
 		counter, ok := v.(crdt.Counter)
 		if !ok {
@@ -205,9 +198,6 @@ func (w *Worker[F]) process(r ClientRequest) {
 		}
 		counter.Decrement()
 		w.kvs.Put(r.Key, v)
-		r.Response <- Response{
-			Context: w.contexts[r.Key],
-		}
 	case Get:
 		var value string
 		v, ok := w.kvs.Get(r.Key)
