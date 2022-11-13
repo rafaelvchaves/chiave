@@ -27,7 +27,7 @@ type Counter interface {
 
 // Sets
 type Set interface {
-	Lookup(string) bool
+	Value() []string
 	Add(string)
 	Remove(string)
 }
