@@ -28,7 +28,6 @@ func TestDVV(t *testing.T) {
 	var client1Ctx *pb.DVV
 	var client2Ctx *pb.DVV
 
-
 	replicaA := replica{id: "a", ctx: &pb.DVV{}}
 	replicaB := replica{id: "b", ctx: &pb.DVV{}}
 
@@ -44,11 +43,9 @@ func TestDVV(t *testing.T) {
 	client2Ctx = replicaA.Update(client2Ctx)
 	// client2Ctx = replicaA.Update(client2Ctx)
 
-
-
 	// replicaA.Sync(replicaB)
 	// replicaB.Sync(replicaA)
-
+	fmt.Println(util.String(client1Ctx))
 	fmt.Println(util.String(client2Ctx))
 	// fmt.Println(util.String(replicaA.ctx))
 	// fmt.Println(util.String(replicaB.ctx))
@@ -64,7 +61,6 @@ type replica struct {
 func (r *replica) Update(clientCtx *pb.DVV) *pb.DVV {
 	u := util.UpdateSingle(clientCtx, r.ctx, r.id)
 	fmt.Println(util.String(u))
-	// fmt.Println(u)
 	if util.Lt(r.ctx, u) {
 		r.ctx = u
 	} else if util.Lt(u, r.ctx) {
@@ -84,6 +80,6 @@ func (r *replica) Sync(o replica) {
 		fmt.Printf("%s lt %s \n", o.id, r.id)
 		// fmt.Println("client context greater than update?")
 	} else {
-		// fmt.Printf("%s lt %s \n", o.id, r.id)
+		fmt.Printf("%s cc %s \n", o.id, r.id)
 	}
 }
