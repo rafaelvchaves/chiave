@@ -2,9 +2,13 @@ package delta
 
 import (
 	"fmt"
+	"kvs/crdt"
 	pb "kvs/proto"
 	"kvs/util"
 )
+
+var _ crdt.Counter = &Counter{}
+var _ crdt.CRDT[crdt.Delta] = &Counter{}
 
 type Counter struct {
 	replica util.Replica

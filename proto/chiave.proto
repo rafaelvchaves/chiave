@@ -63,6 +63,7 @@ message Event {
     DeltaCounter delta_counter = 8;
     OpSet op_set = 9;
     StateSet state_set = 10;
+    DeltaSet delta_set = 11;
   }
 }
 
@@ -106,6 +107,15 @@ message StateSet {
   map<string, int64> history = 2;
 }
 
+message DeltaSet {
+  map<string, Dots> elements = 1;
+  map<string, Versions> history = 2;
+}
+
 message Dots {
   repeated Dot dots = 1;
+}
+
+message Versions {
+  repeated int64 versions = 1;
 }

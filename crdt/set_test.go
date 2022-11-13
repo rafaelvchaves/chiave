@@ -56,38 +56,38 @@ func testSet[F crdt.Flavor](t *testing.T, g generator.Generator[F]) {
 	s2 := v2.(crdt.Set)
 	s3 := v3.(crdt.Set)
 
-	addRemove(r1.String(), s1, []string{"a", "b"}, nil)
-	addRemove(r2.String(), s2, []string{"a"}, []string{"a"})
-	addRemove(r3.String(), s3, []string{"c", "d"}, []string{"d"})
+	addRemove(r1.String(), s1, []string{"x", "y"}, nil)
+	addRemove(r2.String(), s2, []string{"x"}, []string{"x"})
+	addRemove(r3.String(), s3, []string{"z", "w"}, []string{"w"})
 
-	assertEqual(t, "c1 initial val", s1.Value(), []string{"a", "b"}, setCompare)
+	assertEqual(t, "c1 initial val", s1.Value(), []string{"x", "y"}, setCompare)
 	assertEqual(t, "c2 initial val", s2.Value(), nil, setCompare)
-	assertEqual(t, "c3 initial val", s3.Value(), []string{"c"}, setCompare)
+	assertEqual(t, "c3 initial val", s3.Value(), []string{"z"}, setCompare)
 
 	e1 := v1.GetEvent()
 	e2 := v2.GetEvent()
 	e3 := v3.GetEvent()
 
 	v1.PersistEvent(e2)
-	assertEqual(t, "s1 after merging s2", s1.Value(), []string{"a", "b"}, setCompare)
+	assertEqual(t, "s1 after merging s2", s1.Value(), []string{"x", "y"}, setCompare)
 	v1.PersistEvent(e3)
 
 	v2.PersistEvent(e3)
-	assertEqual(t, "s2 after merging s3", s2.Value(), []string{"c"}, setCompare)
+	assertEqual(t, "s2 after merging s3", s2.Value(), []string{"z"}, setCompare)
 	v2.PersistEvent(e1)
 
 	v3.PersistEvent(e1)
-	assertEqual(t, "s3 after merging s1", s3.Value(), []string{"a", "b", "c"}, setCompare)
+	assertEqual(t, "s3 after merging s1", s3.Value(), []string{"x", "y", "z"}, setCompare)
 	v3.PersistEvent(e2)
 
-	assertEqual(t, "s1 final val", s1.Value(), []string{"a", "b", "c"}, setCompare)
-	assertEqual(t, "s2 final val", s2.Value(), []string{"a", "b", "c"}, setCompare)
-	assertEqual(t, "s3 final val", s3.Value(), []string{"a", "b", "c"}, setCompare)
+	assertEqual(t, "s1 final val", s1.Value(), []string{"x", "y", "z"}, setCompare)
+	assertEqual(t, "s2 final val", s2.Value(), []string{"x", "y", "z"}, setCompare)
+	assertEqual(t, "s3 final val", s3.Value(), []string{"x", "y", "z"}, setCompare)
 }
 
-// func TestDeltaSet(t *testing.T) {
-// 	testSet[crdt.Delta](t, generator.Delta{})
-// }
+func TestDeltaSet(t *testing.T) {
+	testSet[crdt.Delta](t, generator.Delta{})
+}
 
 func TestOpSet(t *testing.T) {
 	testSet[crdt.Op](t, generator.Op{})
