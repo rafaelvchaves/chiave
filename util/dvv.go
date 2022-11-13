@@ -70,6 +70,10 @@ func Lt(d1, d2 *pb.DVV) bool {
 	return dot == nil || dot.N <= d2.Clock[dot.Replica]
 }
 
+func CC(d1, d2 *pb.DVV) bool {
+	return !Lt(d1, d2) && !Lt(d2, d1)
+}
+
 func Sync(D1, D2 []*pb.DVV) []*pb.DVV {
 	var result []*pb.DVV
 	for _, x := range D1 {
@@ -144,6 +148,17 @@ func Update(S []*pb.DVV, S_r []*pb.DVV, r string) *pb.DVV {
 		result.Clock[i] = ceil(S, i)
 	}
 	return result
+}
+
+func UpdateSingle(d1 *pb.DVV, d2 *pb.DVV, r string) *pb.DVV {
+	if d1 == nil && d2 == nil {
+		return Update(nil, nil, r)
+	} else if d1 == nil {
+		return Update(nil, []*pb.DVV{d2}, r)
+	} else if d2 == nil {
+		return Update([]*pb.DVV{d1}, nil, r)
+	}
+	return Update([]*pb.DVV{d1}, []*pb.DVV{d2}, r)
 }
 
 func max[T constraints.Ordered](t1, t2 T) T {
