@@ -22,8 +22,12 @@ message Response {
 message Request {
   string key = 1;
   int32 worker_id = 2;
-  repeated DVV context = 3;
-  repeated string args = 4;
+  repeated string args = 3;
+  Context context = 4;
+}
+
+message Context {
+  Dot dot = 1;
 }
 
 message GetResponse {
@@ -33,14 +37,13 @@ message GetResponse {
 }
 
 message DVV {
-  map<string, int32> clock = 1;
+  map<string, int64> clock = 1;
   Dot dot = 2;
-  string sibling = 3; 
 }
 
 message Dot {
   string replica = 1;
-  int32 n = 2;
+  int64 n = 2;
 }
 
 enum DT {

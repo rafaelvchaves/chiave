@@ -7,7 +7,7 @@ import (
 	"golang.org/x/exp/constraints"
 )
 
-func displayMap(m map[string]int32) string {
+func displayMap(m map[string]int64) string {
 	str := "{"
 	i := 0
 	for k, v := range m {
@@ -28,36 +28,36 @@ func String(context ...*pb.DVV) string {
 	return str
 }
 
-func dvvVals(dvv *pb.DVV) []string {
-	var result []string
-	result = append(result, dvv.Sibling)
-	for r := range dvv.Clock {
-		result = append(result, r)
-	}
-	return result
-}
+// func dvvVals(dvv *pb.DVV) []string {
+// 	var result []string
+// 	result = append(result, dvv.Sibling)
+// 	for r := range dvv.Clock {
+// 		result = append(result, r)
+// 	}
+// 	return result
+// }
 
-func values(D []*pb.DVV) []string {
-	var result []string
-	for _, dvv := range D {
-		result = append(result, dvvVals(dvv)...)
-	}
-	return result
-}
+// func values(D []*pb.DVV) []string {
+// 	var result []string
+// 	for _, dvv := range D {
+// 		result = append(result, dvvVals(dvv)...)
+// 	}
+// 	return result
+// }
 
-func Reconcile(f func([]string) string, D []*pb.DVV, r string) *pb.DVV {
-	d := Join(D)
-	d.Sibling = f(values(D))
-	d.Dot = &pb.Dot{
-		Replica: r,
-		N:       ceil(D, r),
-	}
-	return d
-}
+// func Reconcile(f func([]string) string, D []*pb.DVV, r string) *pb.DVV {
+// 	d := Join(D)
+// 	d.Sibling = f(values(D))
+// 	d.Dot = &pb.Dot{
+// 		Replica: r,
+// 		N:       ceil(D, r),
+// 	}
+// 	return d
+// }
 
 func Join(D []*pb.DVV) *pb.DVV {
 	result := &pb.DVV{
-		Clock: make(map[string]int32),
+		Clock: make(map[string]int64),
 	}
 	for _, i := range ids(D) {
 		result.Clock[i] = ceil(D, i)
@@ -120,7 +120,7 @@ func ids(dvvs []*pb.DVV) []string {
 	return result
 }
 
-func dvvCeil(dvv *pb.DVV, r string) int32 {
+func dvvCeil(dvv *pb.DVV, r string) int64 {
 	dot := dvv.Dot
 	if dot != nil && dot.Replica == r {
 		return max(dot.N, dvv.Clock[r])
@@ -128,8 +128,8 @@ func dvvCeil(dvv *pb.DVV, r string) int32 {
 	return dvv.Clock[r]
 }
 
-func ceil(dvvs []*pb.DVV, r string) int32 {
-	m := int32(0)
+func ceil(dvvs []*pb.DVV, r string) int64 {
+	m := int64(0)
 	for _, dvv := range dvvs {
 		m = max(m, dvvCeil(dvv, r))
 	}
@@ -142,7 +142,7 @@ func Update(S []*pb.DVV, S_r []*pb.DVV, r string) *pb.DVV {
 			Replica: r,
 			N:       ceil(S_r, r) + 1,
 		},
-		Clock: make(map[string]int32),
+		Clock: make(map[string]int64),
 	}
 	for _, i := range ids(S) {
 		result.Clock[i] = ceil(S, i)
