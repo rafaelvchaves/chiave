@@ -58,6 +58,7 @@ message Event {
     OpCounter op_counter = 6;
     StateCounter state_counter = 7;
     DeltaCounter delta_counter = 8;
+    OpSet op_set = 9;
     StateSet state_set = 10;
   }
 }
@@ -74,6 +75,22 @@ message StateCounter {
 message DeltaCounter {
   map<string, int64> pos = 1;
   map<string, int64> neg = 2;
+}
+
+enum SET_OP {
+  ADD = 0;
+  REM = 1;
+}
+
+message OpSet {
+  repeated SetOperation operations = 1;
+}
+
+message SetOperation {
+  SET_OP op = 1;
+  string element = 2;
+  string tag = 3;
+  repeated string remove_tags = 4;
 }
 
 message StateSet {
