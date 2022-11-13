@@ -7,107 +7,57 @@ import (
 	"kvs/util"
 )
 
-type Set struct {
-	replica util.Replica
-	add     map[string]*pb.GCounter
-	rem     map[string]*pb.GCounter
-}
-
 var _ crdt.Set = &Set{}
+var _ crdt.CRDT[crdt.State] = &Set{}
+
+type Set struct {
+	replica  util.Replica
+	elements map[string]*pb.Dots
+	history  map[string]int64
+}
 
 func NewSet(replica util.Replica) *Set {
 	return &Set{
-		replica: replica,
-		add:     make(map[string]*pb.GCounter),
-		rem:     make(map[string]*pb.GCounter),
+		replica:  replica,
+		elements: make(map[string]*pb.Dots),
+		history:  make(map[string]int64),
 	}
 }
 
-func (s *Set) Lookup(e string) bool {
-	// _, ok := s.set[e]
-	return true
-}
-
-func (s *Set) Value() map[string]struct{} {
-	set := make(map[string]struct{})
-	for k := range s.add {
-		set[k] = struct{}{}
-	}
-	for k, vr := range s.rem {
-		// if the element exists in the remove set
-		// with a strictly greater timestamp,
-		// remove it from the resulting set.
-		if va, ok := s.add[k]; ok && Compare(va, vr) == LT {
-			delete(set, k)
-		}
-	}
-	return set
-}
-
-func (s *Set) Add(e string) {
-	if va, ok := s.add[e]; ok {
-		Increment(va)
-		delete(s.rem, e)
-		return
-	}
-	if vr, ok := s.rem[e]; ok {
-		s.add[e] = vr
-		Increment(vr)
-		delete(s.rem, e)
-		return
-	}
-	vec := NewGCounter(s.replica.String())
-	Increment(vec)
-	s.add[e] = vec
-}
-
-func (s *Set) Remove(e string) {
-	if va, ok := s.add[e]; ok {
-		s.rem[e] = va
-		Increment(va)
-		delete(s.add, e)
-		return
-	}
-	if vr, ok := s.rem[e]; ok {
-		s.add[e] = vr
-		Increment(vr)
-		delete(s.add, e)
-		return
-	}
-	vec := NewGCounter(s.replica.String())
-	Increment(vec)
-	s.rem[e] = vec
-}
-
-func (s *Set) Merge(add, rem map[string]*pb.GCounter) {
-	for k, v := range add {
-		vo, ok := s.add[k]
-		if ok {
-			Merge(vo, v)
+func (s *Set) Value() []string {
+	var result []string
+	for e, d := range s.elements {
+		if len(d.Dots) == 0 {
 			continue
 		}
-		s.add[k] = v
+		result = append(result, e)
 	}
-	for k, v := range rem {
-		vo, ok := s.rem[k]
-		if ok {
-			Merge(vo, v)
-			continue
-		}
-		s.rem[k] = v
-	}
-	for k, vr := range s.rem {
-		va, ok := s.add[k]
-		if ok && Compare(vr, va) == GT {
-			delete(s.add, k)
+	return result
+}
+
+func (s *Set) String() string {
+	set := s.Value()
+	str := "{"
+	for i, e := range set {
+		str += e
+		if i < len(s.elements) {
+			str += ","
 		}
 	}
-	for k, va := range s.add {
-		vr, ok := s.add[k]
-		if ok && Compare(va, vr) == GT {
-			delete(s.rem, k)
-		}
+	return str + "}"
+}
+
+func (s *Set) Add(ctx *pb.Context, e string) {
+	dot := ctx.Dot
+	r, c := dot.Replica, dot.N
+	s.history[r] = c
+	s.elements[e] = &pb.Dots{
+		Dots: []*pb.Dot{dot},
 	}
+}
+
+func (s *Set) Remove(ctx *pb.Context, e string) {
+	delete(s.elements, e)
 }
 
 func (s *Set) GetEvent() *pb.Event {
@@ -116,19 +66,11 @@ func (s *Set) GetEvent() *pb.Event {
 		Datatype: pb.DT_Set,
 		Data: &pb.Event_StateSet{
 			StateSet: &pb.StateSet{
-				Add: copy(s.add),
-				Rem: copy(s.rem),
+				Elements: s.elements,
+				History:  s.history,
 			},
 		},
 	}
-}
-
-func copy(m map[string]*pb.GCounter) map[string]*pb.GCounter {
-	result := make(map[string]*pb.GCounter)
-	for k, v := range m {
-		result[k] = Copy(v)
-	}
-	return result
 }
 
 func (s *Set) PersistEvent(event *pb.Event) {
@@ -137,19 +79,50 @@ func (s *Set) PersistEvent(event *pb.Event) {
 		fmt.Println("warning: nil state set encountered in PersistEvent")
 		return
 	}
-	s.Merge(ss.Add, ss.Rem)
-}
-
-func (s *Set) String() string {
-	set := s.Value()
-	str := "{"
-	i := 0
-	for e := range set {
-		i++
-		str += e
-		if i < len(set) {
-			str += ","
+	for e, d := range s.elements {
+		dots := d.Dots
+		_, ok := ss.Elements[e]
+		if !ok {
+			util.Filter(func(dot *pb.Dot) bool {
+				return dot.N > ss.History[dot.Replica]
+			}, &dots)
 		}
 	}
-	return str + "}"
+	for eo, do := range ss.Elements {
+		dots := do.Dots
+		d, ok := s.elements[eo]
+		if !ok {
+			util.Filter(func(dot *pb.Dot) bool {
+				return dot.N > s.history[dot.Replica]
+			}, &dots)
+			s.elements[eo] = &pb.Dots{Dots: dots}
+			continue
+		}
+		d.Dots = append(d.Dots, dots...)
+	}
+	for e, d := range s.elements {
+		if len(d.Dots) == 0 {
+			delete(s.elements, e)
+			continue
+		}
+		maxDot := &pb.Dot{}
+		for _, dot := range d.Dots {
+			if dot.N > maxDot.N {
+				maxDot = dot
+			}
+		}
+		s.elements[e] = &pb.Dots{Dots: []*pb.Dot{maxDot}}
+	}
+	for e, vo := range ss.History {
+		v := safeGet(s.history, e)
+		s.history[e] = util.Max(v, vo)
+	}
+}
+
+func safeGet(m map[string]int64, r string) int64 {
+	v, ok := m[r]
+	if !ok {
+		return 0
+	}
+	return v
 }

@@ -9,12 +9,24 @@ import (
 	"testing"
 )
 
-func addRemove(s crdt.Set, add []string, rem []string) {
+func contextWith(replica string, seqNr int64) *pb.Context {
+	return &pb.Context{
+		Dot: &pb.Dot{
+			Replica: replica,
+			N:       seqNr,
+		},
+	}
+}
+
+func addRemove(replica string, s crdt.Set, add []string, rem []string) {
+	n := int64(0)
 	for _, a := range add {
-		s.Add(a)
+		n++
+		s.Add(contextWith(replica, n), a)
 	}
 	for _, r := range rem {
-		s.Remove(r)
+		n++
+		s.Remove(contextWith(replica, n), r)
 	}
 }
 
@@ -33,17 +45,20 @@ func setCompare(s1, s2 []string) bool {
 }
 
 func testSet[F crdt.Flavor](t *testing.T, g generator.Generator[F]) {
-	v1 := g.New(pb.DT_Set, util.NewReplica("a", 1))
-	v2 := g.New(pb.DT_Set, util.NewReplica("a", 2))
-	v3 := g.New(pb.DT_Set, util.NewReplica("a", 3))
+	r1 := util.NewReplica("a", 1)
+	r2 := util.NewReplica("a", 2)
+	r3 := util.NewReplica("a", 3)
+	v1 := g.New(pb.DT_Set, r1)
+	v2 := g.New(pb.DT_Set, r2)
+	v3 := g.New(pb.DT_Set, r3)
 
 	s1 := v1.(crdt.Set)
 	s2 := v2.(crdt.Set)
 	s3 := v3.(crdt.Set)
 
-	addRemove(s1, []string{"a", "b"}, nil)
-	addRemove(s2, []string{"a"}, []string{"a"})
-	addRemove(s3, []string{"c", "d"}, []string{"d"})
+	addRemove(r1.String(), s1, []string{"a", "b"}, nil)
+	addRemove(r2.String(), s2, []string{"a"}, []string{"a"})
+	addRemove(r3.String(), s3, []string{"c", "d"}, []string{"d"})
 
 	assertEqual(t, "c1 initial val", s1.Value(), []string{"a", "b"}, setCompare)
 	assertEqual(t, "c2 initial val", s2.Value(), nil, setCompare)
@@ -78,6 +93,6 @@ func TestOpSet(t *testing.T) {
 	testSet[crdt.Op](t, generator.Op{})
 }
 
-// func TestStateSet(t *testing.T) {
-// 	testSet[crdt.State](t, generator.State{})
-// }
+func TestStateSet(t *testing.T) {
+	testSet[crdt.State](t, generator.State{})
+}

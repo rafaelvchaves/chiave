@@ -2,9 +2,13 @@ package state
 
 import (
 	"fmt"
+	"kvs/crdt"
 	pb "kvs/proto"
 	"kvs/util"
 )
+
+var _ crdt.Counter = &Counter{}
+var _ crdt.CRDT[crdt.State] = &Counter{}
 
 type Counter struct {
 	replica util.Replica

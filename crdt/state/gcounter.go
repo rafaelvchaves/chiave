@@ -42,18 +42,10 @@ func Value(g *pb.GCounter) int {
 	return sum
 }
 
-func SafeGet(g *pb.GCounter, r string) int64 {
-	v, ok := g.Vec[r]
-	if !ok {
-		return 0
-	}
-	return v
-}
-
 func Compare(g1, g2 *pb.GCounter) Ord {
 	ord := EQ
 	for k, va := range g1.Vec {
-		vb := SafeGet(g2, k)
+		vb := safeGet(g2.Vec, k)
 		switch {
 		case ord == EQ && va > vb:
 			ord = GT
@@ -74,7 +66,7 @@ func String(g *pb.GCounter) string {
 
 func Merge(g1, g2 *pb.GCounter) {
 	for k, vo := range g2.Vec {
-		v := SafeGet(g1, k)
+		v := safeGet(g1.Vec, k)
 		g1.Vec[k] = util.Max(v, vo)
 	}
 }

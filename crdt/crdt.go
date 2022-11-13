@@ -28,22 +28,6 @@ type Counter interface {
 // Sets
 type Set interface {
 	Value() []string
-	Add(string)
-	Remove(string)
-}
-
-// Graphs
-type Vertex string
-
-type Edge struct {
-	// src, dest string
-}
-
-type Graph interface {
-	AddVertex(v Vertex)
-	RemoveVertex(v Vertex)
-	AddEdge(e Edge)
-	RemoveEdge(e Edge)
-	LookupEdge(e Edge) bool
-	LookupVertex(v Vertex) bool
+	Add(*pb.Context, string)
+	Remove(*pb.Context, string)
 }

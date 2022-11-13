@@ -2,9 +2,13 @@ package op
 
 import (
 	"fmt"
+	"kvs/crdt"
 	pb "kvs/proto"
 	"kvs/util"
 )
+
+var _ crdt.Counter = &Counter{}
+var _ crdt.CRDT[crdt.Op] = &Counter{}
 
 type Counter struct {
 	replica util.Replica

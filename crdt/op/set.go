@@ -2,11 +2,15 @@ package op
 
 import (
 	"fmt"
+	"kvs/crdt"
 	pb "kvs/proto"
 	"kvs/util"
 
 	"github.com/google/uuid"
 )
+
+var _ crdt.Set = &Set{}
+var _ crdt.CRDT[crdt.Op] = &Set{}
 
 type Set struct {
 	replica  util.Replica
@@ -32,7 +36,7 @@ func NewSet(replica util.Replica) *Set {
 	}
 }
 
-func (s *Set) Add(e string) {
+func (s *Set) Add(ctx *pb.Context, e string) {
 	u := uuid.New().String()
 	s.elements[e] = append(s.elements[e], u)
 	eventData := s.current.GetOpSet()
@@ -42,7 +46,7 @@ func (s *Set) Add(e string) {
 		Tag:     u,
 	})
 }
-func (s *Set) Remove(e string) {
+func (s *Set) Remove(ctx *pb.Context, e string) {
 	removeTags := s.elements[e]
 	delete(s.elements, e)
 	eventData := s.current.GetOpSet()
@@ -65,10 +69,9 @@ func (s *Set) Value() []string {
 }
 
 func (s *Set) String() string {
+	set := s.Value()
 	str := "{"
-	i := 0
-	for e := range s.elements {
-		i++
+	for i, e := range set {
 		str += e
 		if i < len(s.elements) {
 			str += ","
@@ -82,6 +85,7 @@ func (s *Set) GetEvent() *pb.Event {
 	s.current = newSetEvent(s.replica)
 	return current
 }
+
 func (s *Set) PersistEvent(event *pb.Event) {
 	os := event.GetOpSet()
 	if os == nil {
@@ -94,28 +98,8 @@ func (s *Set) PersistEvent(event *pb.Event) {
 		case pb.SET_OP_ADD:
 			tags = append(tags, op.Tag)
 		case pb.SET_OP_REM:
-			filter(func(u string) bool { return !contains(u, op.RemoveTags) }, &tags)
+			util.Filter(func(u string) bool { return !util.Contains(u, op.RemoveTags) }, &tags)
 		}
 		s.elements[op.Element] = tags
 	}
-}
-
-func filter[T any](p func(T) bool, lst *[]T) {
-	i := 0
-	for _, x := range *lst {
-		if p(x) {
-			(*lst)[i] = x
-			i++
-		}
-	}
-	*lst = (*lst)[:i]
-}
-
-func contains[T comparable](target T, lst []T) bool {
-	for _, x := range lst {
-		if x == target {
-			return true
-		}
-	}
-	return false
 }
