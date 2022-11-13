@@ -112,37 +112,37 @@ func (w *Worker[F]) Start() {
 				}
 			}
 		}
-		// phase 2: go through all affected keys and broadcast to other owners
-		changeset.Range(func(key string) bool {
-			v, ok := w.kvs.Get(key)
-			if !ok {
-				return true
-			}
-			e := v.GetEvent()
-			e.Key = key
-			// e.Context = w.contexts[key]
-			w.broadcast(e)
-			return true
-		})
+		// 	// phase 2: go through all affected keys and broadcast to other owners
+		// 	changeset.Range(func(key string) bool {
+		// 		v, ok := w.kvs.Get(key)
+		// 		if !ok {
+		// 			return true
+		// 		}
+		// 		e := v.GetEvent()
+		// 		e.Key = key
+		// 		// e.Context = w.contexts[key]
+		// 		w.broadcast(e)
+		// 		return true
+		// 	})
 
-		timeout = time.After(requestDeadline)
-	eventLoop:
-		for {
-			select {
-			case event := <-w.events:
-				// w.logger.Infof("")
-				wid := strings.Split(event.Source, ",")[1]
-				w.logger.Infof("worker %d received event from %s, context = %s\n", w.replica.WorkerID, wid, display(event.Context))
-				// w.logContext(event.Key)
-				// w.contexts[event.Key] = util.Sync(w.contexts[event.Key], event.Context)
-				// w.logContext(event.Key)
-				v := w.kvs.GetOrDefault(event.Key, w.generator.New(event.Datatype, w.replica))
-				v.PersistEvent(event)
-				w.kvs.Put(event.Key, v)
-			case <-timeout:
-				break eventLoop
-			}
-		}
+		// 	timeout = time.After(requestDeadline)
+		// eventLoop:
+		// 	for {
+		// 		select {
+		// 		case event := <-w.events:
+		// 			// w.logger.Infof("")
+		// 			wid := strings.Split(event.Source, ",")[1]
+		// 			w.logger.Infof("worker %d received event from %s, context = %s\n", w.replica.WorkerID, wid, display(event.Context))
+		// 			// w.logContext(event.Key)
+		// 			// w.contexts[event.Key] = util.Sync(w.contexts[event.Key], event.Context)
+		// 			// w.logContext(event.Key)
+		// 			v := w.kvs.GetOrDefault(event.Key, w.generator.New(event.Datatype, w.replica))
+		// 			v.PersistEvent(event)
+		// 			w.kvs.Put(event.Key, v)
+		// 		case <-timeout:
+		// 			break eventLoop
+		// 		}
+		// 	}
 	}
 }
 
