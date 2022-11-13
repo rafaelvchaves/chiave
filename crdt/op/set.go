@@ -1,91 +1,121 @@
 package op
 
 import (
+	"fmt"
 	pb "kvs/proto"
 	"kvs/util"
-	"strings"
 
-	"github.com/emirpasic/gods/sets/treeset"
+	"github.com/google/uuid"
 )
-
-type Ord int
-
-type Context interface {
-	Compare(Context) Ord
-	Merge(Context) Context
-}
 
 type Set struct {
 	replica  util.Replica
-	add, rem *treeset.Set
+	elements map[string][]string
+	current  *pb.Event
 }
 
-type element struct {
-	e   string
-	ctx Context
-}
-
-func compare(e1, e2 any) int {
-	return strings.Compare(e1.(element).e, e2.(element).e)
-}
-
-func NewSet(r util.Replica) *Set {
-	return &Set{
-		replica: r,
-		add:     treeset.NewWith(compare),
-		rem:     treeset.NewWith(compare),
+func newSetEvent(replica util.Replica) *pb.Event {
+	return &pb.Event{
+		Source:   replica.String(),
+		Datatype: pb.DT_Set,
+		Data: &pb.Event_OpSet{
+			OpSet: &pb.OpSet{},
+		},
 	}
 }
 
-func (s *Set) Add(e string, ctx Context) {
-	s.add.Add(element{
-		e:   e,
-		ctx: ctx,
+func NewSet(replica util.Replica) *Set {
+	return &Set{
+		replica:  replica,
+		elements: make(map[string][]string),
+		current:  newSetEvent(replica),
+	}
+}
+
+func (s *Set) Add(e string) {
+	u := uuid.New().String()
+	s.elements[e] = append(s.elements[e], u)
+	eventData := s.current.GetOpSet()
+	eventData.Operations = append(eventData.Operations, &pb.SetOperation{
+		Op:      pb.SET_OP_ADD,
+		Element: e,
+		Tag:     u,
 	})
 }
-func (s *Set) Remove(e string, ctx Context) {
-	
+func (s *Set) Remove(e string) {
+	removeTags := s.elements[e]
+	delete(s.elements, e)
+	eventData := s.current.GetOpSet()
+	eventData.Operations = append(eventData.Operations, &pb.SetOperation{
+		Op:         pb.SET_OP_REM,
+		Element:    e,
+		RemoveTags: removeTags,
+	})
 }
-func (s *Set) Lookup(e string, ctx Context) bool { return false }
-func (s *Set) GetEvent() *pb.Event               { return &pb.Event{} }
-func (s *Set) PersistEvent(event *pb.Event)      {}
 
-func (s *Set) String() string { return "" }
+func (s *Set) Value() []string {
+	var result []string
+	for e, tags := range s.elements {
+		if len(tags) == 0 {
+			continue
+		}
+		result = append(result, e)
+	}
+	return result
+}
 
-// type AddHandler struct{}
+func (s *Set) String() string {
+	str := "{"
+	i := 0
+	for e := range s.elements {
+		i++
+		str += e
+		if i < len(s.elements) {
+			str += ","
+		}
+	}
+	return str + "}"
+}
 
-// func (AddHandler) Prepare(s ORSet, val any) (any, bool) {
-// 	alpha := uuid.New().String()
-// 	return data.NewPair(val.(string), alpha), true
-// }
+func (s *Set) GetEvent() *pb.Event {
+	current := s.current
+	s.current = newSetEvent(s.replica)
+	return current
+}
+func (s *Set) PersistEvent(event *pb.Event) {
+	os := event.GetOpSet()
+	if os == nil {
+		fmt.Println("warning: nil opset encountered in PersistEvent")
+		return
+	}
+	for _, op := range os.Operations {
+		tags := s.elements[op.Element]
+		switch op.Op {
+		case pb.SET_OP_ADD:
+			tags = append(tags, op.Tag)
+		case pb.SET_OP_REM:
+			filter(func(u string) bool { return !contains(u, op.RemoveTags) }, &tags)
+		}
+		s.elements[op.Element] = tags
+	}
+}
 
-// func (AddHandler) Effect(s *ORSet, val any) {
-// 	v, ok := val.(data.Pair[string, tag])
-// 	if !ok {
-// 		return
-// 	}
-// 	s.s.Add(v)
-// }
+func filter[T any](p func(T) bool, lst *[]T) {
+	i := 0
+	for _, x := range *lst {
+		if p(x) {
+			(*lst)[i] = x
+			i++
+		}
+	}
+	*lst = (*lst)[:i]
+}
 
-// type RemoveHandler struct{}
-
-// func (RemoveHandler) Prepare(s ORSet, val any) (any, bool) {
-// 	R := s.s.Filter(func(p data.Pair[string, tag]) bool {
-// 		return p.First == val.(string)
-// 	})
-// 	return R, true
-// }
-
-// func (RemoveHandler) Effect(s *ORSet, val any) {
-// 	v, ok := val.(data.Set[data.Pair[string, tag]])
-// 	if !ok {
-// 		return
-// 	}
-// 	s.s.Subtract(v)
-// }
-
-// type ExistsQuery struct{}
-
-// func (ExistsQuery) Query(s ORSet, args any) string {
-// 	return String(s.s.Exists(func(p data.Pair[string, tag]) bool { return p.First == args.(string) }))
-// }
+func contains[T comparable](target T, lst []T) bool {
+	for _, x := range lst {
+		if x == target {
+			return true
+		}
+	}
+	return false
+}

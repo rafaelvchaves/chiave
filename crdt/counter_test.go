@@ -17,13 +17,15 @@ func incDecMN(c crdt.Counter, m, n int) {
 	}
 }
 
-func assertEqual[T comparable](t *testing.T, name string, got, want T) {
-	if got != want {
+func assertEqual[T any](t *testing.T, name string, got, want T, equals func(T, T) bool) {
+	if !equals(got, want) {
 		t.Errorf("%s: got %v, want %v", name, got, want)
 	}
 }
 
-func testFlavor[F crdt.Flavor](t *testing.T, g generator.Generator[F]) {
+func intCompare(i, j int) bool { return i == j }
+
+func testCounter[F crdt.Flavor](t *testing.T, g generator.Generator[F]) {
 	v1 := g.New(pb.DT_Counter, util.NewReplica("a", 1))
 	v2 := g.New(pb.DT_Counter, util.NewReplica("a", 2))
 	v3 := g.New(pb.DT_Counter, util.NewReplica("a", 3))
@@ -36,39 +38,39 @@ func testFlavor[F crdt.Flavor](t *testing.T, g generator.Generator[F]) {
 	incDecMN(c2, 1, 4)
 	incDecMN(c3, 3, 0)
 
-	assertEqual(t, "c1 initial val", c1.Value(), 2)
-	assertEqual(t, "c2 initial val", c2.Value(), -3)
-	assertEqual(t, "c3 initial val", c3.Value(), 3)
+	assertEqual(t, "c1 initial val", c1.Value(), 2, intCompare)
+	assertEqual(t, "c2 initial val", c2.Value(), -3, intCompare)
+	assertEqual(t, "c3 initial val", c3.Value(), 3, intCompare)
 
 	e1 := v1.GetEvent()
 	e2 := v2.GetEvent()
 	e3 := v3.GetEvent()
 
 	v1.PersistEvent(e2)
-	assertEqual(t, "c1 after merging c2", c1.Value(), -1)
+	assertEqual(t, "c1 after merging c2", c1.Value(), -1, intCompare)
 	v1.PersistEvent(e3)
 
 	v2.PersistEvent(e3)
-	assertEqual(t, "c2 after merging c3", c2.Value(), 0)
+	assertEqual(t, "c2 after merging c3", c2.Value(), 0, intCompare)
 	v2.PersistEvent(e1)
 
 	v3.PersistEvent(e1)
-	assertEqual(t, "c3 after merging c1", c3.Value(), 5)
+	assertEqual(t, "c3 after merging c1", c3.Value(), 5, intCompare)
 	v3.PersistEvent(e2)
 
-	assertEqual(t, "c1 final val", c1.Value(), 2)
-	assertEqual(t, "c2 final val", c2.Value(), 2)
-	assertEqual(t, "c3 final val", c3.Value(), 2)
+	assertEqual(t, "c1 final val", c1.Value(), 2, intCompare)
+	assertEqual(t, "c2 final val", c2.Value(), 2, intCompare)
+	assertEqual(t, "c3 final val", c3.Value(), 2, intCompare)
 }
 
 func TestDeltaCounter(t *testing.T) {
-	testFlavor[crdt.Delta](t, generator.Delta{})
+	testCounter[crdt.Delta](t, generator.Delta{})
 }
 
 func TestOpCounter(t *testing.T) {
-	testFlavor[crdt.Op](t, generator.Op{})
+	testCounter[crdt.Op](t, generator.Op{})
 }
 
 func TestStateCounter(t *testing.T) {
-	testFlavor[crdt.State](t, generator.State{})
+	testCounter[crdt.State](t, generator.State{})
 }

@@ -12,19 +12,23 @@ type Counter struct {
 	current *pb.Event
 }
 
+func newCounterEvent(replica util.Replica) *pb.Event {
+	return &pb.Event{
+		Source:   replica.String(),
+		Datatype: pb.DT_Counter,
+		Data: &pb.Event_OpCounter{
+			OpCounter: &pb.OpCounter{
+				Update: 0,
+			},
+		},
+	}
+}
+
 func NewCounter(replica util.Replica) *Counter {
 	return &Counter{
 		replica: replica,
 		c:       0,
-		current: &pb.Event{
-			Source:   replica.String(),
-			Datatype: pb.DT_Counter,
-			Data: &pb.Event_OpCounter{
-				OpCounter: &pb.OpCounter{
-					Update: 0,
-				},
-			},
-		},
+		current: newCounterEvent(replica),
 	}
 }
 
@@ -50,15 +54,7 @@ func (c *Counter) Decrement() {
 
 func (c *Counter) GetEvent() *pb.Event {
 	current := c.current
-	c.current = &pb.Event{
-		Source:   c.replica.String(),
-		Datatype: pb.DT_Counter,
-		Data: &pb.Event_OpCounter{
-			OpCounter: &pb.OpCounter{
-				Update: 0,
-			},
-		},
-	}
+	c.current = newCounterEvent(c.replica)
 	return current
 }
 
