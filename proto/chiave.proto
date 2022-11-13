@@ -75,6 +75,11 @@ message StateCounter {
   GCounter neg = 2;
 }
 
+message GCounter {
+  map<string, int64> vec = 1;
+  string replica = 2;
+}
+
 message DeltaCounter {
   map<string, int64> pos = 1;
   map<string, int64> neg = 2;
@@ -97,11 +102,10 @@ message SetOperation {
 }
 
 message StateSet {
-  map<string, GCounter> add = 1;
-  map<string, GCounter> rem = 2;
+  map<string, Dots> elements = 1;
+  map<string, int64> history = 2;
 }
 
-message GCounter {
-  map<string, int64> vec = 1;
-  string replica = 2;
+message Dots {
+  repeated Dot dots = 1;
 }
