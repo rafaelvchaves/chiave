@@ -7,15 +7,13 @@ require golang.org/x/exp v0.0.0-20221010202428-3a778c567f61
 require github.com/buraksezer/consistent v0.9.0
 
 require (
-	github.com/emirpasic/gods v1.18.1
+	github.com/google/uuid v1.3.0
 	github.com/leemcloughlin/gofarmhash v0.0.0-20160919192320-0a055c5b87a8
-	github.com/spenczar/tdigest v2.1.0+incompatible
 	google.golang.org/grpc v1.50.0
 	google.golang.org/protobuf v1.27.1
 )
 
 require (
-	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
 	golang.org/x/net v0.0.0-20201021035429-f5854403a974 // indirect
 	golang.org/x/sys v0.0.0-20220722155257-8c9f86f7a55f // indirect
