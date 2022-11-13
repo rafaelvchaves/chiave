@@ -96,9 +96,8 @@ func (l *leader[_]) Get(ctx context.Context, in *pb.Request) (*pb.GetResponse, e
 	l.workers[in.WorkerId].PutRequest(req)
 	r := <-req.Response
 	return &pb.GetResponse{
-		Value:   r.Value,
-		Exists:  r.Exists,
-		Context: r.Context,
+		Value:  r.Value,
+		Exists: r.Exists,
 	}, nil
 }
 
@@ -127,12 +126,10 @@ func (l *leader[_]) AddSet(ctx context.Context, in *pb.Request) (*pb.Response, e
 		Key:       in.Key,
 		Operation: worker.AddSet,
 		Context:   in.Context,
-		Response:  make(chan worker.Response, 1),
 		Params:    in.Args,
 	}
 	l.workers[in.WorkerId].PutRequest(req)
-	r := <-req.Response
-	return &pb.Response{Context: r.Context}, nil
+	return &pb.Response{}, nil
 }
 
 func (l *leader[_]) RemoveSet(ctx context.Context, in *pb.Request) (*pb.Response, error) {
@@ -144,12 +141,11 @@ func (l *leader[_]) RemoveSet(ctx context.Context, in *pb.Request) (*pb.Response
 		Params:    in.Args,
 	}
 	l.workers[in.WorkerId].PutRequest(req)
-	r := <-req.Response
-	return &pb.Response{Context: r.Context}, nil
+	return &pb.Response{}, nil
 }
 
 func main() {
-	addr := flag.String("a", "localhost:4747", "ip address to start leader at")
+	addr := flag.String("a", util.LoadConfig().Addresses[0], "ip address to start leader at")
 	flavor := flag.String("crdt", "op", "CRDT flavor (op, state, delta)")
 	flag.Parse()
 	f := fromString[*flavor]
@@ -165,28 +161,3 @@ func main() {
 	pb.RegisterChiaveServer(server, leader)
 	server.Serve(listener)
 }
-
-// func getAddress() (string, error) {
-// 	ip, err := getHost()
-// 	port := "4747"
-// 	if err != nil {
-// 		return "", err
-// 	}
-// 	addr := net.JoinHostPort(ip, port)
-// 	return addr, nil
-// }
-
-// func getHost() (string, error) {
-// 	addrs, err := net.InterfaceAddrs()
-// 	if err != nil {
-// 		return "", fmt.Errorf("could not get interface addresses")
-// 	}
-// 	for _, address := range addrs {
-// 		if ipnet, ok := address.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
-// 			if ipnet.IP.To4() != nil {
-// 				return ipnet.IP.String(), nil
-// 			}
-// 		}
-// 	}
-// 	return "", fmt.Errorf("cannot find IP")
-// }

@@ -65,7 +65,6 @@ type ClientRequest struct {
 type Response = struct {
 	Value   string
 	Exists  bool
-	Context []*pb.DVV
 }
 
 func New[F crdt.Flavor](replica util.Replica, generator generator.Generator[F], logger *util.Logger) *Worker[F] {
@@ -157,7 +156,6 @@ func (w *Worker[F]) process(r ClientRequest) {
 		r.Response <- Response{
 			Value:   value,
 			Exists:  ok,
-			Context: w.contexts[r.Key],
 		}
 	case AddSet:
 		v := w.kvs.GetOrDefault(r.Key, w.generator.New(pb.DT_Set, w.replica))
@@ -165,7 +163,7 @@ func (w *Worker[F]) process(r ClientRequest) {
 		if !ok {
 			return
 		}
-		set.Add(r.Params[0])
+		set.Add(r.Context, r.Params[0])
 		w.kvs.Put(r.Key, v)
 	case RemoveSet:
 		v := w.kvs.GetOrDefault(r.Key, w.generator.New(pb.DT_Set, w.replica))
@@ -173,7 +171,7 @@ func (w *Worker[F]) process(r ClientRequest) {
 		if !ok {
 			return
 		}
-		set.Remove(r.Params[0])
+		set.Remove(r.Context, r.Params[0])
 		w.kvs.Put(r.Key, v)
 	}
 }
