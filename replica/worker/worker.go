@@ -2,13 +2,11 @@ package worker
 
 import (
 	"context"
-	"fmt"
 	"kvs/crdt"
 	"kvs/crdt/generator"
 	pb "kvs/proto"
 	"kvs/util"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/buraksezer/consistent"
@@ -61,7 +59,7 @@ type ClientRequest struct {
 	Operation Operation
 	Params    []string
 	Response  chan Response
-	Context   []*pb.DVV
+	Context   *pb.Context
 }
 
 type Response = struct {
@@ -83,14 +81,6 @@ func New[F crdt.Flavor](replica util.Replica, generator generator.Generator[F], 
 		cfg:         util.LoadConfig(),
 		logger:      logger,
 	}
-}
-
-func (w *Worker[F]) Get(key string) (string, bool) {
-	v, ok := w.kvs.Get(key)
-	if ok {
-		return v.String(), true
-	}
-	return "", false
 }
 
 func (w *Worker[F]) Start() {
@@ -120,7 +110,6 @@ func (w *Worker[F]) Start() {
 			}
 			e := v.GetEvent()
 			e.Key = key
-			// e.Context = w.contexts[key]
 			w.broadcast(e)
 			return true
 		})
@@ -130,12 +119,6 @@ func (w *Worker[F]) Start() {
 		for {
 			select {
 			case event := <-w.events:
-				// w.logger.Infof("")
-				wid := strings.Split(event.Source, ",")[1]
-				w.logger.Infof("worker %d received event from %s, context = %s\n", w.replica.WorkerID, wid, display(event.Context))
-				// w.logContext(event.Key)
-				// w.contexts[event.Key] = util.Sync(w.contexts[event.Key], event.Context)
-				// w.logContext(event.Key)
 				v := w.kvs.GetOrDefault(event.Key, w.generator.New(event.Datatype, w.replica))
 				v.PersistEvent(event)
 				w.kvs.Put(event.Key, v)
@@ -146,41 +129,8 @@ func (w *Worker[F]) Start() {
 	}
 }
 
-func displayMap(m map[string]int32) string {
-	str := "{"
-	i := 0
-	for k, v := range m {
-		i++
-		r := strings.Split(k, ",")[1]
-		str += fmt.Sprintf("%s:%d", r, v)
-		if i < len(m) {
-			str += ","
-		}
-	}
-	return str + "}"
-}
-
-func display(context []*pb.DVV) string {
-	str := ""
-	for _, dvv := range context {
-		r := strings.Split(dvv.Dot.Replica, ",")[1]
-		str += fmt.Sprintf("(%s:%d, %s)", r, dvv.Dot.N, displayMap(dvv.Clock))
-	}
-	return str
-}
-
-func (w *Worker[F]) logContext(key string) {
-	w.logger.Infof("worker %d context: %+v, len = %d", w.replica.WorkerID, display(w.contexts[key]), len(w.contexts[key]))
-}
-
-func (w *Worker[F]) logRequestHandle(key string, o Operation, args []string) {
-	w.logger.Infof("worker %d handling %s(%v) on key %q", w.replica.WorkerID, o.String(), args, key)
-}
-
 func (w *Worker[F]) process(r ClientRequest) {
 	w.logRequestHandle(r.Key, r.Operation, r.Params)
-	w.logger.Infof("incoming client context: %s", display(r.Context))
-	w.logContext(r.Key)
 	switch r.Operation {
 	case Increment:
 		v := w.kvs.GetOrDefault(r.Key, w.generator.New(pb.DT_Counter, w.replica))
@@ -210,11 +160,6 @@ func (w *Worker[F]) process(r ClientRequest) {
 			Context: w.contexts[r.Key],
 		}
 	case AddSet:
-		// u := util.Update(r.Context, w.contexts[r.Key], w.replica.String())
-		// w.contexts[r.Key] = util.Sync(w.contexts[r.Key], []*pb.DVV{u})
-		// if len(w.contexts[r.Key]) > 1 {
-		// 	fmt.Println("conflicting: ", display(w.contexts[r.Key]))
-		// }
 		v := w.kvs.GetOrDefault(r.Key, w.generator.New(pb.DT_Set, w.replica))
 		set, ok := v.(crdt.Set)
 		if !ok {
@@ -222,12 +167,7 @@ func (w *Worker[F]) process(r ClientRequest) {
 		}
 		set.Add(r.Params[0])
 		w.kvs.Put(r.Key, v)
-		r.Response <- Response{
-			Context: w.contexts[r.Key],
-		}
 	case RemoveSet:
-		// u := util.Update(r.Context, w.contexts[r.Key], w.replica.String())
-		// w.contexts[r.Key] = util.Sync(w.contexts[r.Key], []*pb.DVV{u})
 		v := w.kvs.GetOrDefault(r.Key, w.generator.New(pb.DT_Set, w.replica))
 		set, ok := v.(crdt.Set)
 		if !ok {
@@ -235,9 +175,6 @@ func (w *Worker[F]) process(r ClientRequest) {
 		}
 		set.Remove(r.Params[0])
 		w.kvs.Put(r.Key, v)
-		r.Response <- Response{
-			Context: w.contexts[r.Key],
-		}
 	}
 }
 
@@ -261,6 +198,10 @@ func (w *Worker[F]) broadcast(event *pb.Event) {
 			w.logger.Errorf("ProcessEvent from %s to %s: %v", w.replica.String(), v.String(), err)
 		}
 	}
+}
+
+func (w *Worker[F]) logRequestHandle(key string, o Operation, args []string) {
+	w.logger.Infof("worker %d handling %s(%v) on key %q", w.replica.WorkerID, o.String(), args, key)
 }
 
 func (w *Worker[_]) PutRequest(r ClientRequest) {

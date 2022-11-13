@@ -8,6 +8,8 @@ import (
 	"math/rand"
 	"time"
 
+	"github.com/google/uuid"
+
 	"github.com/buraksezer/consistent"
 	"google.golang.org/grpc"
 )
@@ -35,15 +37,17 @@ func (c ChiaveSet) string() string {
 type ChiaveRegister string
 
 type Proxy struct {
+	id          string
+	seqNrs      map[string]int64
 	connections map[string]*grpc.ClientConn
 	hashRing    *consistent.Consistent
 	repFactor   int
-	context     []*pb.DVV
-	// id uuid
 }
 
 func NewProxy() *Proxy {
 	p := &Proxy{
+		id:          uuid.New().String(),
+		seqNrs:      make(map[string]int64),
 		connections: util.GetConnections(),
 		hashRing:    util.GetHashRing(),
 		repFactor:   util.LoadConfig().RepFactor,
@@ -75,11 +79,11 @@ func (p *Proxy) Increment(key ChiaveCounter) error {
 		_, err := client.Increment(ctx, &pb.Request{
 			Key:      key.string(),
 			WorkerId: int32(r.WorkerID),
-			Context:  p.context,
 		})
 		if err == nil {
 			return nil
 		}
+		fmt.Println(err)
 	}
 	return fmt.Errorf("failed to reach owners of key %q", key)
 }
@@ -97,7 +101,6 @@ func (p *Proxy) Decrement(key ChiaveCounter) error {
 		_, err := client.Decrement(ctx, &pb.Request{
 			Key:      key.string(),
 			WorkerId: int32(r.WorkerID),
-			Context:  p.context,
 		})
 		if err == nil {
 			return nil
@@ -122,7 +125,6 @@ func (p *Proxy) Get(key Key) (string, error) {
 			WorkerId: int32(r.WorkerID),
 		})
 		if err == nil {
-			p.context = util.Sync(p.context, res.Context)
 			return res.Value, nil
 		}
 	}
@@ -130,7 +132,9 @@ func (p *Proxy) Get(key Key) (string, error) {
 }
 
 func (p *Proxy) AddSet(key ChiaveSet, element string) error {
-	owners, err := p.ownersOf(key.string())
+	k := key.string()
+	p.seqNrs[k]++
+	owners, err := p.ownersOf(k)
 	if err != nil {
 		return err
 	}
@@ -139,14 +143,18 @@ func (p *Proxy) AddSet(key ChiaveSet, element string) error {
 		client := pb.NewChiaveClient(p.connections[r.Addr])
 		ctx, cancel := context.WithTimeout(context.Background(), RPCTimeout)
 		defer cancel()
-		res, err := client.AddSet(ctx, &pb.Request{
-			Key:      key.string(),
+		_, err := client.AddSet(ctx, &pb.Request{
+			Key:      k,
 			WorkerId: int32(r.WorkerID),
-			Context:  p.context,
 			Args:     []string{element},
+			Context: &pb.Context{
+				Dot: &pb.Dot{
+					Replica: p.id,
+					N:       p.seqNrs[k],
+				},
+			},
 		})
 		if err == nil {
-			p.context = util.Sync(p.context, res.Context)
 			return nil
 		}
 	}
@@ -154,7 +162,9 @@ func (p *Proxy) AddSet(key ChiaveSet, element string) error {
 }
 
 func (p *Proxy) RemoveSet(key ChiaveSet, element string) error {
-	owners, err := p.ownersOf(key.string())
+	k := key.string()
+	p.seqNrs[k]++
+	owners, err := p.ownersOf(k)
 	if err != nil {
 		return err
 	}
@@ -163,14 +173,18 @@ func (p *Proxy) RemoveSet(key ChiaveSet, element string) error {
 		client := pb.NewChiaveClient(p.connections[r.Addr])
 		ctx, cancel := context.WithTimeout(context.Background(), RPCTimeout)
 		defer cancel()
-		res, err := client.RemoveSet(ctx, &pb.Request{
-			Key:      key.string(),
+		_, err := client.RemoveSet(ctx, &pb.Request{
+			Key:      k,
 			WorkerId: int32(r.WorkerID),
-			Context:  p.context,
 			Args:     []string{element},
+			Context: &pb.Context{
+				Dot: &pb.Dot{
+					Replica: p.id,
+					N:       p.seqNrs[k],
+				},
+			},
 		})
 		if err == nil {
-			p.context = util.Sync(p.context, res.Context)
 			return nil
 		}
 	}
