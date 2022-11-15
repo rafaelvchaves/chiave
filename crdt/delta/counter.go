@@ -50,7 +50,7 @@ func (c *Counter) String() string {
 	return fmt.Sprintf("%d", c.Value())
 }
 
-func (c *Counter) GetEvent() *pb.Event {
+func (c *Counter) PrepareEvent() *pb.Event {
 	return &pb.Event{
 		Source:   c.replica.String(),
 		Datatype: pb.DT_Counter,
@@ -63,7 +63,7 @@ func (c *Counter) GetEvent() *pb.Event {
 	}
 }
 
-func (s *Counter) PersistEvent(event *pb.Event) {
+func (c *Counter) PersistEvent(event *pb.Event) {
 	dc := event.GetDeltaCounter()
 	if dc == nil {
 		fmt.Println("warning: nil delta counter encountered in PersistEvent")
@@ -73,5 +73,9 @@ func (s *Counter) PersistEvent(event *pb.Event) {
 		posDelta: dc.Pos,
 		negDelta: dc.Neg,
 	}
-	s.Merge(d)
+	c.Merge(d)
+}
+
+func (c *Counter) Context() *pb.Context {
+	return nil
 }

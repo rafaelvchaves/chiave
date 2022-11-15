@@ -5,7 +5,6 @@ import (
 	"kvs/crdt"
 	pb "kvs/proto"
 	"kvs/util"
-	"strings"
 )
 
 var _ crdt.Set = &Set{}
@@ -14,7 +13,7 @@ var _ crdt.CRDT[crdt.Delta] = &Set{}
 type Set struct {
 	replica  util.Replica
 	elements map[string]*pb.Dots
-	history  map[string]*pb.Versions
+	dvv      *pb.DVV
 	delta    *pb.DeltaSet
 }
 
@@ -22,15 +21,30 @@ func NewSet(replica util.Replica) *Set {
 	return &Set{
 		replica:  replica,
 		elements: make(map[string]*pb.Dots),
-		history:  make(map[string]*pb.Versions),
-		delta:    newDeltaSet(replica),
+		dvv: &pb.DVV{
+			Dot: &pb.Dot{
+				Replica: replica.String(),
+				N:       0,
+			},
+			Clock: make(map[string]int64),
+		},
+		delta: &pb.DeltaSet{
+			Elements: make(map[string]*pb.Dots),
+			Dvv: &pb.DVV{
+				Dot: &pb.Dot{
+					Replica: replica.String(),
+					N:       0,
+				},
+				Clock: make(map[string]int64),
+			},
+		},
 	}
 }
 
-func newDeltaSet(replica util.Replica) *pb.DeltaSet {
+func (s *Set) newDeltaSet() *pb.DeltaSet {
 	return &pb.DeltaSet{
 		Elements: make(map[string]*pb.Dots),
-		History:  make(map[string]*pb.Versions),
+		Dvv:      s.dvv,
 	}
 }
 
@@ -57,20 +71,102 @@ func (s *Set) String() string {
 	return str + "}"
 }
 
+func addDots(elements map[string]*pb.Dots, e string, dots ...*pb.Dot) {
+	if _, ok := elements[e]; !ok {
+		elements[e] = &pb.Dots{}
+	}
+	elements[e].Dots = append(elements[e].Dots, dots...)
+}
+
 func (s *Set) Add(ctx *pb.Context, e string) {
-	dot := ctx.Dot
-	r, c := dot.Replica, dot.N
-	if _, ok := s.history[r]; !ok {
-		s.history[r] = &pb.Versions{}
+	u := util.UpdateSingle(ctx.Dvv, s.dvv, s.replica.String())
+	switch util.Compare(ctx.Dvv, u) {
+	case util.LT:
+		s.dvv = u
+		s.delta.Dvv = u // is using the same pointer a problem?
+	case util.CC:
+		s.dvv = util.Join(ctx.Dvv, u)
+		s.delta.Dvv = util.Join(ctx.Dvv, u)
 	}
-	s.history[r].Versions = append(s.history[r].Versions, c)
-	s.elements[e] = &pb.Dots{
-		Dots: []*pb.Dot{dot},
+	dot := u.Dot
+	addDots(s.elements, e, dot)
+	addDots(s.delta.Elements, e, dot)
+	s.printState()
+}
+
+func getDots(elements map[string]*pb.Dots, e string) []*pb.Dot {
+	d, ok := elements[e]
+	if !ok {
+		return nil
 	}
-	if _, ok := s.delta.Elements[e]; !ok {
-		s.delta.Elements[e] = &pb.Dots{}
+	return d.Dots
+}
+
+func (s *Set) Remove(ctx *pb.Context, e string) {
+	u := util.UpdateSingle(ctx.Dvv, s.dvv, s.replica.String())
+	switch util.Compare(ctx.Dvv, u) {
+	case util.LT:
+		s.dvv = u
+		s.delta.Dvv = u
+		delete(s.elements, e)
+		delete(s.delta.Elements, e)
+	case util.CC:
+		// filter out all dots in client context's causal history?
+		dots := getDots(s.elements, e)
+		util.Filter(func(dot *pb.Dot) bool {
+			return !util.ContainedIn(dot, ctx.Dvv)
+		}, &dots)
+		s.dvv = util.Join(ctx.Dvv, u)
+		s.delta.Dvv = util.Join(ctx.Dvv, u)
 	}
-	s.delta.Elements[e].Dots = append(s.delta.Elements[e].Dots, dot)
+	s.printState()
+}
+
+func (s *Set) PrepareEvent() *pb.Event {
+	delta := s.delta
+	s.delta = s.newDeltaSet()
+	return &pb.Event{
+		Source:   s.replica.String(),
+		Datatype: pb.DT_Set,
+		Data: &pb.Event_DeltaSet{
+			DeltaSet: delta,
+		},
+	}
+}
+
+func (s *Set) PersistEvent(event *pb.Event) {
+	ds := event.GetDeltaSet()
+	if ds == nil {
+		fmt.Println("warning: nil delta set encountered in PersistEvent")
+		return
+	}
+	for e, d := range s.elements {
+		dots := d.Dots
+		if _, ok := ds.Elements[e]; !ok {
+			// for every element that this replica contains, but the other
+			// replica does not, we only keep the dots that are not contained
+			// in the DVV of the other replica.
+			util.Filter(func(dot *pb.Dot) bool {
+				return !util.ContainedIn(dot, ds.Dvv)
+			}, &dots)
+		}
+	}
+	for e, d := range ds.Elements {
+		dots := d.Dots
+		if _, ok := s.elements[e]; !ok {
+			util.Filter(func(dot *pb.Dot) bool {
+				return !util.ContainedIn(dot, s.dvv)
+			}, &dots)
+		}
+		addDots(s.elements, e, dots...)
+	}
+	s.dvv = util.Sync(s.dvv, ds.Dvv)
+}
+
+func (s *Set) Context() *pb.Context {
+	return &pb.Context{
+		Dvv: s.dvv,
+	}
 }
 
 func printList(lst []string) {
@@ -90,111 +186,26 @@ func printElements(elements map[string]*pb.Dots) {
 	for e, d := range elements {
 		dots := d.Dots
 		for _, dot := range dots {
-			elems = append(elems, fmt.Sprintf("(%s, %q, %d)", e, strings.Split(dot.Replica, ",")[1], dot.N))
+			elems = append(elems, fmt.Sprintf("(%s, %q, %d)", e, dot.Replica, dot.N))
 		}
 	}
 	printList(elems)
 }
 
-func printHistory(history map[string]*pb.Versions) {
-	var elems []string
-	for r, v := range history {
-		for _, i := range v.Versions {
-			elems = append(elems, fmt.Sprintf("(%q, %d)", strings.Split(r, ",")[1], i))
-		}
-	}
-	printList(elems)
+func printDVV(dvv *pb.DVV) {
+	fmt.Println(util.String(dvv))
 }
 
 //lint:ignore U1000 Ignore unused warning: only used for debugging
 func (s *Set) printState() {
+	fmt.Printf("State of %d\n", s.replica.WorkerID)
 	fmt.Println("Elements:")
 	printElements(s.elements)
-	fmt.Println("History:")
-	printHistory(s.history)
+	fmt.Println("DVV:")
+	printDVV(s.dvv)
 	fmt.Println("Delta Elements:")
 	printElements(s.delta.Elements)
-	fmt.Println("Delta History:")
-	printHistory(s.delta.History)
-}
-
-func (s *Set) Remove(ctx *pb.Context, e string) {
-	if _, ok := s.elements[e]; !ok {
-		s.elements[e] = &pb.Dots{}
-	}
-	var removedDots []*pb.Dot
-	for _, d := range s.elements[e].Dots {
-		if _, ok := s.delta.History[d.Replica]; !ok {
-			s.delta.History[d.Replica] = &pb.Versions{}
-		}
-		if util.Contains(d.N, s.history[d.Replica].Versions) {
-			s.delta.History[d.Replica].Versions = append(s.delta.History[d.Replica].Versions, d.N)
-			removedDots = append(removedDots, d)
-		}
-	}
-	delete(s.elements, e)
-	for _, d := range removedDots {
-		r, c := d.Replica, d.N
-		if v, ok := s.history[r]; ok {
-			versions := v.Versions
-			util.Filter(func(i int64) bool { return i != c }, &versions)
-			v.Versions = versions
-		}
-	}
-}
-
-func (s *Set) GetEvent() *pb.Event {
-	delta := s.delta
-	s.delta = newDeltaSet(s.replica)
-	return &pb.Event{
-		Source:   s.replica.String(),
-		Datatype: pb.DT_Set,
-		Data: &pb.Event_DeltaSet{
-			DeltaSet: delta,
-		},
-	}
-}
-
-func (s *Set) PersistEvent(event *pb.Event) {
-	ds := event.GetDeltaSet()
-	if ds == nil {
-		fmt.Println("warning: nil delta set encountered in PersistEvent")
-		return
-	}
-	for e, d := range s.elements {
-		dots := d.Dots
-		_, ok := ds.Elements[e]
-		if !ok {
-			util.Filter(func(dot *pb.Dot) bool {
-				v, ok := ds.History[dot.Replica]
-				if !ok {
-					return true
-				}
-				return !util.Contains(dot.N, v.Versions)
-			}, &dots)
-		}
-	}
-	for eo, do := range ds.Elements {
-		dots := do.Dots
-		d, ok := s.elements[eo]
-		if !ok {
-			util.Filter(func(dot *pb.Dot) bool {
-				v, ok := ds.History[dot.Replica]
-				if !ok {
-					return true
-				}
-				return !util.Contains(dot.N, v.Versions)
-			}, &dots)
-			s.elements[eo] = &pb.Dots{Dots: dots}
-			continue
-		}
-		d.Dots = append(d.Dots, dots...)
-	}
-	for r, v := range ds.History {
-		versions := v.Versions
-		if _, ok := s.history[r]; !ok {
-			s.history[r] = &pb.Versions{}
-		}
-		s.history[r].Versions = append(s.history[r].Versions, versions...)
-	}
+	fmt.Println("Delta DVV:")
+	printDVV(s.delta.Dvv)
+	fmt.Println()
 }

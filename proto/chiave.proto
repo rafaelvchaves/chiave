@@ -28,6 +28,7 @@ message Request {
 
 message Context {
   Dot dot = 1;
+  DVV dvv = 2;
 }
 
 message GetResponse {
@@ -109,13 +110,9 @@ message StateSet {
 
 message DeltaSet {
   map<string, Dots> elements = 1;
-  map<string, Versions> history = 2;
+  DVV dvv = 2;
 }
 
 message Dots {
   repeated Dot dots = 1;
-}
-
-message Versions {
-  repeated int64 versions = 1;
 }
