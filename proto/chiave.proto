@@ -27,14 +27,12 @@ message Request {
 }
 
 message Context {
-  Dot dot = 1;
-  DVV dvv = 2;
+  DVV dvv = 1;
 }
 
 message GetResponse {
   string value = 1;
   bool exists = 2;
-  repeated DVV context = 3;
 }
 
 message DVV {
@@ -57,13 +55,12 @@ message Event {
   int32 dest = 2;
   string key = 3;
   DT datatype = 4;
-  repeated DVV context = 5;
   oneof data {
-    OpCounter op_counter = 6;
-    StateCounter state_counter = 7;
-    DeltaCounter delta_counter = 8;
-    OpSet op_set = 9;
-    StateSet state_set = 10;
+    OpCounter op_counter = 5;
+    StateCounter state_counter = 6;
+    DeltaCounter delta_counter = 7;
+    OpSet op_set = 8;
+    StateSet state_set = 9;
   }
 }
 
@@ -86,13 +83,13 @@ message DeltaCounter {
   map<string, int64> neg = 2;
 }
 
+message OpSet {
+  repeated SetOperation operations = 1;
+}
+
 enum SET_OP {
   ADD = 0;
   REM = 1;
-}
-
-message OpSet {
-  repeated SetOperation operations = 1;
 }
 
 message SetOperation {
