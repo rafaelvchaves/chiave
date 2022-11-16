@@ -42,9 +42,9 @@ func testCounter[F crdt.Flavor](t *testing.T, g generator.Generator[F]) {
 	assertEqual(t, "c2 initial val", c2.Value(), -3, intCompare)
 	assertEqual(t, "c3 initial val", c3.Value(), 3, intCompare)
 
-	e1 := v1.GetEvent()
-	e2 := v2.GetEvent()
-	e3 := v3.GetEvent()
+	e1 := v1.PrepareEvent()
+	e2 := v2.PrepareEvent()
+	e3 := v3.PrepareEvent()
 
 	v1.PersistEvent(e2)
 	assertEqual(t, "c1 after merging c2", c1.Value(), -1, intCompare)

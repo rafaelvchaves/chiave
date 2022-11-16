@@ -56,7 +56,7 @@ func (c *Counter) Decrement() {
 	update.Update -= 1
 }
 
-func (c *Counter) GetEvent() *pb.Event {
+func (c *Counter) PrepareEvent() *pb.Event {
 	current := c.current
 	c.current = newCounterEvent(c.replica)
 	return current
@@ -69,4 +69,8 @@ func (c *Counter) PersistEvent(event *pb.Event) {
 		return
 	}
 	c.c += oc.Update
+}
+
+func (c *Counter) Context() *pb.Context {
+	return nil
 }

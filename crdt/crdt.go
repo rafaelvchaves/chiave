@@ -14,8 +14,9 @@ type Flavor interface {
 
 type CRDT[F Flavor] interface {
 	String() string
-	GetEvent() *pb.Event
+	PrepareEvent() *pb.Event
 	PersistEvent(*pb.Event)
+	Context() *pb.Context
 }
 
 // Counters

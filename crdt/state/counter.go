@@ -47,7 +47,7 @@ func (c *Counter) Copy() Counter {
 	return *cpy
 }
 
-func (c *Counter) GetEvent() *pb.Event {
+func (c *Counter) PrepareEvent() *pb.Event {
 	return &pb.Event{
 		Source:   c.replica.String(),
 		Datatype: pb.DT_Counter,
@@ -68,4 +68,8 @@ func (s *Counter) PersistEvent(event *pb.Event) {
 	}
 	Merge(s.pos, sc.Pos)
 	Merge(s.neg, sc.Neg)
+}
+
+func (c *Counter) Context() *pb.Context {
+	return nil
 }

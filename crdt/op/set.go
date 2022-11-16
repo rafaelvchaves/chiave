@@ -80,7 +80,7 @@ func (s *Set) String() string {
 	return str + "}"
 }
 
-func (s *Set) GetEvent() *pb.Event {
+func (s *Set) PrepareEvent() *pb.Event {
 	current := s.current
 	s.current = newSetEvent(s.replica)
 	return current
@@ -102,4 +102,8 @@ func (s *Set) PersistEvent(event *pb.Event) {
 		}
 		s.elements[op.Element] = tags
 	}
+}
+
+func (s *Set) Context() *pb.Context {
+	return &pb.Context{Dvv: &pb.DVV{}}
 }

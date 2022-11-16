@@ -48,7 +48,7 @@ func (s *Set) String() string {
 }
 
 func (s *Set) Add(ctx *pb.Context, e string) {
-	dot := ctx.Dot
+	dot := ctx.Dvv.Dot
 	r, c := dot.Replica, dot.N
 	s.history[r] = c
 	s.elements[e] = &pb.Dots{
@@ -60,7 +60,7 @@ func (s *Set) Remove(ctx *pb.Context, e string) {
 	delete(s.elements, e)
 }
 
-func (s *Set) GetEvent() *pb.Event {
+func (s *Set) PrepareEvent() *pb.Event {
 	return &pb.Event{
 		Source:   s.replica.String(),
 		Datatype: pb.DT_Set,
@@ -125,4 +125,8 @@ func safeGet(m map[string]int64, r string) int64 {
 		return 0
 	}
 	return v
+}
+
+func (s *Set) Context() *pb.Context {
+	return nil
 }
