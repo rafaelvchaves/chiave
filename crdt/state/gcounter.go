@@ -42,6 +42,14 @@ func Value(g *pb.GCounter) int {
 	return sum
 }
 
+func safeGet(m map[string]int64, r string) int64 {
+	v, ok := m[r]
+	if !ok {
+		return 0
+	}
+	return v
+}
+
 func Compare(g1, g2 *pb.GCounter) Ord {
 	ord := EQ
 	for k, va := range g1.Vec {
