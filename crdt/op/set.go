@@ -46,6 +46,7 @@ func (s *Set) Add(ctx *pb.Context, e string) {
 		Tag:     u,
 	})
 }
+
 func (s *Set) Remove(ctx *pb.Context, e string) {
 	removeTags := s.elements[e]
 	delete(s.elements, e)
@@ -106,4 +107,19 @@ func (s *Set) PersistEvent(event *pb.Event) {
 
 func (s *Set) Context() *pb.Context {
 	return &pb.Context{Dvv: &pb.DVV{}}
+}
+
+//lint:ignore U1000 Ignore unused warning: only used for debugging
+func (s *Set) printState(header string) {
+	fmt.Println(header)
+	var result []string
+	for e, tags := range s.elements {
+		if len(tags) == 0 {
+			continue
+		}
+		for _, t := range tags {
+			result = append(result, fmt.Sprintf("(%s, %s)", e, t[:5]))
+		}
+	}
+	fmt.Println(util.ListToString(result))
 }
