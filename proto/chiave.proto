@@ -64,7 +64,6 @@ message Event {
     DeltaCounter delta_counter = 8;
     OpSet op_set = 9;
     StateSet state_set = 10;
-    DeltaSet delta_set = 11;
   }
 }
 
@@ -104,11 +103,6 @@ message SetOperation {
 }
 
 message StateSet {
-  map<string, Dots> elements = 1;
-  map<string, int64> history = 2;
-}
-
-message DeltaSet {
   map<string, Dots> add = 1;
   map<string, Dots> rem = 2;
   DVV DVV = 3;

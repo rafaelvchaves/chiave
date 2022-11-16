@@ -12,12 +12,12 @@ var _ crdt.CRDT[crdt.Delta] = &Set{}
 
 type Set struct {
 	replica util.Replica
-	state   *pb.DeltaSet
-	delta   *pb.DeltaSet
+	state   *pb.StateSet
+	delta   *pb.StateSet
 }
 
-func newState(r string) *pb.DeltaSet {
-	return &pb.DeltaSet{
+func newState(r string) *pb.StateSet {
+	return &pb.StateSet{
 		Add: make(map[string]*pb.Dots),
 		Rem: make(map[string]*pb.Dots),
 		DVV: &pb.DVV{
@@ -50,14 +50,7 @@ func (s *Set) Value() []string {
 }
 
 func (s *Set) String() string {
-	return listToString(s.Value())
-}
-
-func addDots(elements map[string]*pb.Dots, e string, dots ...*pb.Dot) {
-	if _, ok := elements[e]; !ok {
-		elements[e] = &pb.Dots{}
-	}
-	elements[e].Dots = append(elements[e].Dots, dots...)
+	return util.ListToString(s.Value())
 }
 
 func (s *Set) Add(ctx *pb.Context, e string) {
@@ -77,12 +70,11 @@ func (s *Set) Add(ctx *pb.Context, e string) {
 	delete(s.delta.Rem, e)
 }
 
-func getDots(elements map[string]*pb.Dots, e string) *pb.Dots {
-	d, ok := elements[e]
-	if !ok {
-		return &pb.Dots{}
+func addDots(elements map[string]*pb.Dots, e string, dots ...*pb.Dot) {
+	if _, ok := elements[e]; !ok {
+		elements[e] = &pb.Dots{}
 	}
-	return d
+	elements[e].Dots = append(elements[e].Dots, dots...)
 }
 
 func (s *Set) Remove(ctx *pb.Context, e string) {
@@ -110,20 +102,28 @@ func (s *Set) Remove(ctx *pb.Context, e string) {
 	}
 }
 
+func getDots(elements map[string]*pb.Dots, e string) *pb.Dots {
+	d, ok := elements[e]
+	if !ok {
+		return &pb.Dots{}
+	}
+	return d
+}
+
 func (s *Set) PrepareEvent() *pb.Event {
 	delta := s.delta
 	s.delta = newState(s.replica.String())
 	return &pb.Event{
 		Source:   s.replica.String(),
 		Datatype: pb.DT_Set,
-		Data: &pb.Event_DeltaSet{
-			DeltaSet: delta,
+		Data: &pb.Event_StateSet{
+			StateSet: delta,
 		},
 	}
 }
 
 func (s *Set) PersistEvent(event *pb.Event) {
-	ds := event.GetDeltaSet()
+	ds := event.GetStateSet()
 	if ds == nil {
 		fmt.Println("warning: nil delta set encountered in PersistEvent")
 		return
@@ -177,18 +177,6 @@ func (s *Set) printState() {
 	fmt.Println(str)
 }
 
-func listToString(lst []string) string {
-	str := "{"
-	for i, e := range lst {
-		str += e
-		if i < len(lst)-1 {
-			str += ","
-		}
-	}
-	str = str + "}"
-	return str
-}
-
 func setToString(elements map[string]*pb.Dots) string {
 	var elems []string
 	for e, d := range elements {
@@ -197,5 +185,5 @@ func setToString(elements map[string]*pb.Dots) string {
 			elems = append(elems, fmt.Sprintf("(%s, %q, %d)", e, dot.Replica, dot.N))
 		}
 	}
-	return listToString(elems)
+	return util.ListToString(elems)
 }
