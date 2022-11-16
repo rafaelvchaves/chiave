@@ -28,10 +28,14 @@ func displayMap(m map[string]int64) string {
 	return str + "}"
 }
 
-func String(context ...*pb.DVV) string {
+func String(dvvs ...*pb.DVV) string {
 	str := ""
-	for _, dvv := range context {
-		str += fmt.Sprintf("(%s:%d, %s)", dvv.Dot.Replica, dvv.Dot.N, displayMap(dvv.Clock))
+	for _, dvv := range dvvs {
+		if dvv == nil {
+			str += "(<nil>)"
+		} else {
+			str += fmt.Sprintf("(%s:%d, %s)", dvv.Dot.Replica, dvv.Dot.N, displayMap(dvv.Clock))
+		}
 	}
 	return str
 }
@@ -90,8 +94,13 @@ func Sync(d1, d2 *pb.DVV) *pb.DVV {
 }
 
 func dvvIDs(dvv *pb.DVV) []string {
+	if dvv == nil {
+		return nil
+	}
 	var result []string
-	result = append(result, dvv.Dot.Replica)
+	if dvv.Dot != nil {
+		result = append(result, dvv.Dot.Replica)
+	}
 	for r := range dvv.Clock {
 		result = append(result, r)
 	}
