@@ -21,7 +21,7 @@ type CRDT[F Flavor] interface {
 
 // Counters
 type Counter interface {
-	Value() int
+	Value() int64
 	Increment()
 	Decrement()
 }

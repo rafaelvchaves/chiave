@@ -34,10 +34,10 @@ func Increment(g *pb.GCounter) {
 	g.Vec[id] = v + 1
 }
 
-func Value(g *pb.GCounter) int {
-	sum := 0
+func Value(g *pb.GCounter) int64 {
+	sum := int64(0)
 	for _, count := range g.Vec {
-		sum += int(count)
+		sum += count
 	}
 	return sum
 }

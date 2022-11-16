@@ -41,10 +41,10 @@ func (g *GCounter) Increment() {
 	g.delta[id] = v + 1
 }
 
-func (g *GCounter) Value() int {
-	sum := 0
+func (g *GCounter) Value() int64 {
+	sum := int64(0)
 	for _, count := range g.vec {
-		sum += int(count)
+		sum += count
 	}
 	return sum
 }

@@ -23,7 +23,7 @@ func assertEqual[T any](t *testing.T, name string, got, want T, equals func(T, T
 	}
 }
 
-func intCompare(i, j int) bool { return i == j }
+func intCompare(i, j int64) bool { return i == j }
 
 func testCounter[F crdt.Flavor](t *testing.T, g generator.Generator[F]) {
 	v1 := g.New(pb.DT_Counter, util.NewReplica("a", 1))

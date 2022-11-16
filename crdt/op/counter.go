@@ -36,8 +36,8 @@ func NewCounter(replica util.Replica) *Counter {
 	}
 }
 
-func (c *Counter) Value() int {
-	return int(c.c)
+func (c *Counter) Value() int64 {
+	return c.c
 }
 
 func (c *Counter) String() string {

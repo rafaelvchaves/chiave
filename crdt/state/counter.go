@@ -24,7 +24,7 @@ func NewCounter(replica util.Replica) *Counter {
 	}
 }
 
-func (c *Counter) Value() int {
+func (c *Counter) Value() int64 {
 	return Value(c.pos) - Value(c.neg)
 }
 
