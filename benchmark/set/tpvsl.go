@@ -15,7 +15,7 @@ func measureLatency(proxy *client.Proxy, n int) {
 	var latencies []time.Duration
 	for i := 0; i < n; i++ {
 		now := time.Now()
-		if err := proxy.Increment(client.ChiaveCounter(fmt.Sprint(i))); err != nil {
+		if err := proxy.RemoveSet(client.ChiaveSet(fmt.Sprint(i)), fmt.Sprint(i)); err != nil {
 			fmt.Println(err)
 			os.Exit(1)
 		}
@@ -35,7 +35,7 @@ func measureThroughput(proxy *client.Proxy, n int, nSeconds int) {
 		for i := 0; i < n; i++ {
 			wg.Add(1)
 			go func(i int) {
-				if err := proxy.AddSet(client.ChiaveSet(fmt.Sprint(i%10000)), fmt.Sprint(i%10000)); err != nil {
+				if err := proxy.AddSet(client.ChiaveSet(fmt.Sprint(i)), fmt.Sprint(i)); err != nil {
 					fmt.Println(err)
 					os.Exit(1)
 				}
