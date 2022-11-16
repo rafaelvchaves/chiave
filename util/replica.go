@@ -24,7 +24,7 @@ func NewReplica(addr string, workerID int) Replica {
 }
 
 func (r Replica) String() string {
-	return r.Addr + "," + fmt.Sprintf("%d", r.WorkerID)
+	return r.Addr + "#" + fmt.Sprintf("%d", r.WorkerID)
 }
 
 type hasher struct{}

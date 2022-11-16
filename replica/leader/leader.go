@@ -87,60 +87,47 @@ func (l *leader[_]) ProcessEvent(ctx context.Context, in *pb.Event) (*emptypb.Em
 	return &emptypb.Empty{}, nil
 }
 
-func (l *leader[_]) Get(ctx context.Context, in *pb.Request) (*pb.GetResponse, error) {
-	req := worker.ClientRequest{
-		Key:       in.Key,
-		Operation: worker.Get,
-		Response:  make(chan worker.Response, 1),
+func (l *leader[_]) GetCounter(ctx context.Context, in *pb.Request) (*pb.GetCounterResponse, error) {
+	req := worker.LeaderRequest{
+		Inner:    in,
+		Response: make(chan worker.Response, 1),
 	}
 	l.workers[in.WorkerId].PutRequest(req)
 	r := <-req.Response
-	return &pb.GetResponse{
-		Value:  r.Value,
-		Exists: r.Exists,
+	return &pb.GetCounterResponse{
+		Context: r.Context,
+		Value:   r.CounterValue,
 	}, nil
 }
 
-func (l *leader[_]) Increment(ctx context.Context, in *pb.Request) (*pb.Response, error) {
-	req := worker.ClientRequest{
-		Key:       in.Key,
-		Operation: worker.Increment,
-		Context:   in.Context,
-	}
-	l.workers[in.WorkerId].PutRequest(req)
-	return &pb.Response{}, nil
-}
-
-func (l *leader[_]) Decrement(ctx context.Context, in *pb.Request) (*pb.Response, error) {
-	req := worker.ClientRequest{
-		Key:       in.Key,
-		Operation: worker.Decrement,
-		Context:   in.Context,
-	}
-	l.workers[in.WorkerId].PutRequest(req)
-	return &pb.Response{}, nil
-}
-
-func (l *leader[_]) AddSet(ctx context.Context, in *pb.Request) (*pb.Response, error) {
-	req := worker.ClientRequest{
-		Key:       in.Key,
-		Operation: worker.AddSet,
-		Context:   in.Context,
-		Params:    in.Args,
-		Response:  make(chan worker.Response, 1),
+func (l *leader[_]) GetSet(ctx context.Context, in *pb.Request) (*pb.GetSetResponse, error) {
+	req := worker.LeaderRequest{
+		Inner:    in,
+		Response: make(chan worker.Response, 1),
 	}
 	l.workers[in.WorkerId].PutRequest(req)
 	r := <-req.Response
-	return &pb.Response{Context: r.Context}, nil
+	return &pb.GetSetResponse{
+		Context: r.Context,
+		Value:   r.SetValue,
+	}, nil
 }
 
-func (l *leader[_]) RemoveSet(ctx context.Context, in *pb.Request) (*pb.Response, error) {
-	req := worker.ClientRequest{
-		Key:       in.Key,
-		Operation: worker.RemoveSet,
-		Context:   in.Context,
-		Params:    in.Args,
-		Response:  make(chan worker.Response, 1),
+func isAsync(op pb.OP) bool {
+	return op == pb.OP_INCREMENT || op == pb.OP_DECREMENT
+}
+
+func (l *leader[_]) Write(ctx context.Context, in *pb.Request) (*pb.Response, error) {
+	if isAsync(in.Operation) {
+		req := worker.LeaderRequest{
+			Inner: in,
+		}
+		l.workers[in.WorkerId].PutRequest(req)
+		return &pb.Response{}, nil
+	}
+	req := worker.LeaderRequest{
+		Inner:    in,
+		Response: make(chan worker.Response, 1),
 	}
 	l.workers[in.WorkerId].PutRequest(req)
 	r := <-req.Response
@@ -148,7 +135,7 @@ func (l *leader[_]) RemoveSet(ctx context.Context, in *pb.Request) (*pb.Response
 }
 
 func main() {
-	addr := flag.String("a", util.LoadConfig().Addresses[0], "ip address to start leader at")
+	addr := flag.String("ip", util.LoadConfig().Addresses[0], "ip address to start leader at")
 	flavor := flag.String("crdt", "op", "CRDT flavor (op, state, delta)")
 	flag.Parse()
 	f := fromString[*flavor]

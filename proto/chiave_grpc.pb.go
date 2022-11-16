@@ -23,11 +23,9 @@ const _ = grpc.SupportPackageIsVersion7
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type ChiaveClient interface {
-	Get(ctx context.Context, in *Request, opts ...grpc.CallOption) (*GetResponse, error)
-	Increment(ctx context.Context, in *Request, opts ...grpc.CallOption) (*Response, error)
-	Decrement(ctx context.Context, in *Request, opts ...grpc.CallOption) (*Response, error)
-	AddSet(ctx context.Context, in *Request, opts ...grpc.CallOption) (*Response, error)
-	RemoveSet(ctx context.Context, in *Request, opts ...grpc.CallOption) (*Response, error)
+	GetCounter(ctx context.Context, in *Request, opts ...grpc.CallOption) (*GetCounterResponse, error)
+	GetSet(ctx context.Context, in *Request, opts ...grpc.CallOption) (*GetSetResponse, error)
+	Write(ctx context.Context, in *Request, opts ...grpc.CallOption) (*Response, error)
 	ProcessEvent(ctx context.Context, in *Event, opts ...grpc.CallOption) (*emptypb.Empty, error)
 }
 
@@ -39,45 +37,27 @@ func NewChiaveClient(cc grpc.ClientConnInterface) ChiaveClient {
 	return &chiaveClient{cc}
 }
 
-func (c *chiaveClient) Get(ctx context.Context, in *Request, opts ...grpc.CallOption) (*GetResponse, error) {
-	out := new(GetResponse)
-	err := c.cc.Invoke(ctx, "/chiave.Chiave/Get", in, out, opts...)
+func (c *chiaveClient) GetCounter(ctx context.Context, in *Request, opts ...grpc.CallOption) (*GetCounterResponse, error) {
+	out := new(GetCounterResponse)
+	err := c.cc.Invoke(ctx, "/chiave.Chiave/GetCounter", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *chiaveClient) Increment(ctx context.Context, in *Request, opts ...grpc.CallOption) (*Response, error) {
-	out := new(Response)
-	err := c.cc.Invoke(ctx, "/chiave.Chiave/Increment", in, out, opts...)
+func (c *chiaveClient) GetSet(ctx context.Context, in *Request, opts ...grpc.CallOption) (*GetSetResponse, error) {
+	out := new(GetSetResponse)
+	err := c.cc.Invoke(ctx, "/chiave.Chiave/GetSet", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *chiaveClient) Decrement(ctx context.Context, in *Request, opts ...grpc.CallOption) (*Response, error) {
+func (c *chiaveClient) Write(ctx context.Context, in *Request, opts ...grpc.CallOption) (*Response, error) {
 	out := new(Response)
-	err := c.cc.Invoke(ctx, "/chiave.Chiave/Decrement", in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *chiaveClient) AddSet(ctx context.Context, in *Request, opts ...grpc.CallOption) (*Response, error) {
-	out := new(Response)
-	err := c.cc.Invoke(ctx, "/chiave.Chiave/AddSet", in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *chiaveClient) RemoveSet(ctx context.Context, in *Request, opts ...grpc.CallOption) (*Response, error) {
-	out := new(Response)
-	err := c.cc.Invoke(ctx, "/chiave.Chiave/RemoveSet", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/chiave.Chiave/Write", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -97,11 +77,9 @@ func (c *chiaveClient) ProcessEvent(ctx context.Context, in *Event, opts ...grpc
 // All implementations must embed UnimplementedChiaveServer
 // for forward compatibility
 type ChiaveServer interface {
-	Get(context.Context, *Request) (*GetResponse, error)
-	Increment(context.Context, *Request) (*Response, error)
-	Decrement(context.Context, *Request) (*Response, error)
-	AddSet(context.Context, *Request) (*Response, error)
-	RemoveSet(context.Context, *Request) (*Response, error)
+	GetCounter(context.Context, *Request) (*GetCounterResponse, error)
+	GetSet(context.Context, *Request) (*GetSetResponse, error)
+	Write(context.Context, *Request) (*Response, error)
 	ProcessEvent(context.Context, *Event) (*emptypb.Empty, error)
 	mustEmbedUnimplementedChiaveServer()
 }
@@ -110,20 +88,14 @@ type ChiaveServer interface {
 type UnimplementedChiaveServer struct {
 }
 
-func (UnimplementedChiaveServer) Get(context.Context, *Request) (*GetResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method Get not implemented")
+func (UnimplementedChiaveServer) GetCounter(context.Context, *Request) (*GetCounterResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetCounter not implemented")
 }
-func (UnimplementedChiaveServer) Increment(context.Context, *Request) (*Response, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method Increment not implemented")
+func (UnimplementedChiaveServer) GetSet(context.Context, *Request) (*GetSetResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetSet not implemented")
 }
-func (UnimplementedChiaveServer) Decrement(context.Context, *Request) (*Response, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method Decrement not implemented")
-}
-func (UnimplementedChiaveServer) AddSet(context.Context, *Request) (*Response, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method AddSet not implemented")
-}
-func (UnimplementedChiaveServer) RemoveSet(context.Context, *Request) (*Response, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method RemoveSet not implemented")
+func (UnimplementedChiaveServer) Write(context.Context, *Request) (*Response, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Write not implemented")
 }
 func (UnimplementedChiaveServer) ProcessEvent(context.Context, *Event) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ProcessEvent not implemented")
@@ -141,92 +113,56 @@ func RegisterChiaveServer(s grpc.ServiceRegistrar, srv ChiaveServer) {
 	s.RegisterService(&Chiave_ServiceDesc, srv)
 }
 
-func _Chiave_Get_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _Chiave_GetCounter_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(Request)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(ChiaveServer).Get(ctx, in)
+		return srv.(ChiaveServer).GetCounter(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/chiave.Chiave/Get",
+		FullMethod: "/chiave.Chiave/GetCounter",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ChiaveServer).Get(ctx, req.(*Request))
+		return srv.(ChiaveServer).GetCounter(ctx, req.(*Request))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Chiave_Increment_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _Chiave_GetSet_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(Request)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(ChiaveServer).Increment(ctx, in)
+		return srv.(ChiaveServer).GetSet(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/chiave.Chiave/Increment",
+		FullMethod: "/chiave.Chiave/GetSet",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ChiaveServer).Increment(ctx, req.(*Request))
+		return srv.(ChiaveServer).GetSet(ctx, req.(*Request))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Chiave_Decrement_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _Chiave_Write_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(Request)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(ChiaveServer).Decrement(ctx, in)
+		return srv.(ChiaveServer).Write(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/chiave.Chiave/Decrement",
+		FullMethod: "/chiave.Chiave/Write",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ChiaveServer).Decrement(ctx, req.(*Request))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _Chiave_AddSet_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(Request)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(ChiaveServer).AddSet(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/chiave.Chiave/AddSet",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ChiaveServer).AddSet(ctx, req.(*Request))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _Chiave_RemoveSet_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(Request)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(ChiaveServer).RemoveSet(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/chiave.Chiave/RemoveSet",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ChiaveServer).RemoveSet(ctx, req.(*Request))
+		return srv.(ChiaveServer).Write(ctx, req.(*Request))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -257,24 +193,16 @@ var Chiave_ServiceDesc = grpc.ServiceDesc{
 	HandlerType: (*ChiaveServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
-			MethodName: "Get",
-			Handler:    _Chiave_Get_Handler,
+			MethodName: "GetCounter",
+			Handler:    _Chiave_GetCounter_Handler,
 		},
 		{
-			MethodName: "Increment",
-			Handler:    _Chiave_Increment_Handler,
+			MethodName: "GetSet",
+			Handler:    _Chiave_GetSet_Handler,
 		},
 		{
-			MethodName: "Decrement",
-			Handler:    _Chiave_Decrement_Handler,
-		},
-		{
-			MethodName: "AddSet",
-			Handler:    _Chiave_AddSet_Handler,
-		},
-		{
-			MethodName: "RemoveSet",
-			Handler:    _Chiave_RemoveSet_Handler,
+			MethodName: "Write",
+			Handler:    _Chiave_Write_Handler,
 		},
 		{
 			MethodName: "ProcessEvent",

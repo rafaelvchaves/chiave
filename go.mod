@@ -10,7 +10,7 @@ require (
 	github.com/google/uuid v1.3.0
 	github.com/leemcloughlin/gofarmhash v0.0.0-20160919192320-0a055c5b87a8
 	google.golang.org/grpc v1.50.0
-	google.golang.org/protobuf v1.27.1
+	google.golang.org/protobuf v1.28.1
 )
 
 require (

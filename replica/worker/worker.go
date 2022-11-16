@@ -14,16 +14,18 @@ import (
 )
 
 const (
-	rpcTimeout   = 10 * time.Second
-	requestEpoch = 50 * time.Millisecond
-	eventEpoch   = 50 * time.Millisecond
+	rpcTimeout        = 10 * time.Second
+	requestEpoch      = 50 * time.Millisecond
+	eventEpoch        = 50 * time.Millisecond
+	requestBufferSize = 10000
+	eventBufferSize   = 10000
 )
 
 type Worker[F crdt.Flavor] struct {
 	replica     util.Replica
 	generator   generator.Generator[F]
 	kvs         Store[F]
-	requests    chan ClientRequest
+	requests    chan LeaderRequest
 	events      chan *pb.Event
 	hashRing    *consistent.Consistent
 	connections map[string]*grpc.ClientConn
@@ -31,44 +33,15 @@ type Worker[F crdt.Flavor] struct {
 	logger      *util.Logger
 }
 
-type Operation int
-
-const (
-	Get Operation = iota
-	Increment
-	Decrement
-	AddSet
-	RemoveSet
-)
-
-func (o Operation) String() string {
-	switch o {
-	case Get:
-		return "GET"
-	case Increment:
-		return "INC"
-	case Decrement:
-		return "DEC"
-	case AddSet:
-		return "ADD"
-	case RemoveSet:
-		return "REMOVE"
-	}
-	return "UNKNOWN"
+type LeaderRequest struct {
+	Inner    *pb.Request
+	Response chan Response
 }
 
-type ClientRequest struct {
-	Key       string
-	Operation Operation
-	Params    []string
-	Response  chan Response
-	Context   *pb.Context
-}
-
-type Response = struct {
-	Value   string
-	Exists  bool
-	Context *pb.Context
+type Response struct {
+	Context      *pb.Context
+	CounterValue int64
+	SetValue     []string
 }
 
 func New[F crdt.Flavor](replica util.Replica, generator generator.Generator[F], logger *util.Logger) *Worker[F] {
@@ -76,8 +49,8 @@ func New[F crdt.Flavor](replica util.Replica, generator generator.Generator[F], 
 		generator:   generator,
 		replica:     replica,
 		kvs:         NewCache[F](),
-		requests:    make(chan ClientRequest, 10000),
-		events:      make(chan *pb.Event, 10000),
+		requests:    make(chan LeaderRequest, requestBufferSize),
+		events:      make(chan *pb.Event, eventBufferSize),
 		hashRing:    util.GetHashRing(),
 		connections: util.GetConnections(),
 		cfg:         util.LoadConfig(),
@@ -99,8 +72,8 @@ func (w *Worker[F]) Start() {
 				break reqLoop
 			case req := <-w.requests:
 				w.process(req)
-				if req.Operation != Get {
-					changeset.Add(req.Key)
+				if req.Inner.Operation == pb.OP_GETCOUNTER || req.Inner.Operation == pb.OP_GETSET {
+					changeset.Add(req.Inner.Key)
 				}
 			}
 		}
@@ -133,10 +106,11 @@ func (w *Worker[F]) Start() {
 	}
 }
 
-func (w *Worker[F]) process(r ClientRequest) {
-	w.logRequestHandle(r.Key, r.Operation, r.Params)
+func (w *Worker[F]) process(req LeaderRequest) {
+	r := req.Inner
+	w.logRequestHandle(r.Key, r.Operation, r.Args)
 	switch r.Operation {
-	case Increment:
+	case pb.OP_INCREMENT:
 		v := w.kvs.GetOrDefault(r.Key, w.generator.New(pb.DT_Counter, w.replica))
 		counter, ok := v.(crdt.Counter)
 		if !ok {
@@ -144,7 +118,7 @@ func (w *Worker[F]) process(r ClientRequest) {
 		}
 		counter.Increment()
 		w.kvs.Put(r.Key, v)
-	case Decrement:
+	case pb.OP_DECREMENT:
 		v := w.kvs.GetOrDefault(r.Key, w.generator.New(pb.DT_Counter, w.replica))
 		counter, ok := v.(crdt.Counter)
 		if !ok {
@@ -152,38 +126,47 @@ func (w *Worker[F]) process(r ClientRequest) {
 		}
 		counter.Decrement()
 		w.kvs.Put(r.Key, v)
-	case Get:
-		var value string
+	case pb.OP_GETCOUNTER:
+		response := Response{}
 		v, ok := w.kvs.Get(r.Key)
 		if ok {
-			value = v.String()
+			if counter, ok := v.(crdt.Counter); ok {
+				response.CounterValue = counter.Value()
+			}
 		}
-		r.Response <- Response{
-			Value:  value,
-			Exists: ok,
-		}
-	case AddSet:
+		req.Response <- response
+	case pb.OP_ADDSET:
 		v := w.kvs.GetOrDefault(r.Key, w.generator.New(pb.DT_Set, w.replica))
 		set, ok := v.(crdt.Set)
 		if !ok {
 			return
 		}
-		set.Add(r.Context, r.Params[0])
+		set.Add(r.Context, r.Args[0])
 		w.kvs.Put(r.Key, v)
-		r.Response <- Response{
+		req.Response <- Response{
 			Context: v.Context(),
 		}
-	case RemoveSet:
+	case pb.OP_REMOVESET:
 		v := w.kvs.GetOrDefault(r.Key, w.generator.New(pb.DT_Set, w.replica))
 		set, ok := v.(crdt.Set)
 		if !ok {
 			return
 		}
-		set.Remove(r.Context, r.Params[0])
+		set.Remove(r.Context, r.Args[0])
 		w.kvs.Put(r.Key, v)
-		r.Response <- Response{
+		req.Response <- Response{
 			Context: v.Context(),
 		}
+	case pb.OP_GETSET:
+		response := Response{}
+		v, ok := w.kvs.Get(r.Key)
+		if ok {
+			response.Context = v.Context()
+			if set, ok := v.(crdt.Set); ok {
+				response.SetValue = set.Value()
+			}
+		}
+		req.Response <- response
 	}
 }
 
@@ -208,11 +191,11 @@ func (w *Worker[F]) broadcast(event *pb.Event) {
 	}
 }
 
-func (w *Worker[F]) logRequestHandle(key string, o Operation, args []string) {
+func (w *Worker[F]) logRequestHandle(key string, o pb.OP, args []string) {
 	w.logger.Infof("worker %d handling %s(%v) on key %q", w.replica.WorkerID, o.String(), args, key)
 }
 
-func (w *Worker[_]) PutRequest(r ClientRequest) {
+func (w *Worker[_]) PutRequest(r LeaderRequest) {
 	w.requests <- r
 }
 

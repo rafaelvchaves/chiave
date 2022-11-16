@@ -25,10 +25,10 @@ func main() {
 		}
 	}
 	time.Sleep(6 * time.Second)
-	s, err := proxy.Get(key)
+	s, err := proxy.GetSet(key)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
-	fmt.Printf("set: %s\n", s)
+	fmt.Printf("set: %v\n", s)
 }
