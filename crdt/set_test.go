@@ -11,7 +11,6 @@ import (
 
 type replica[F crdt.Flavor] struct {
 	id      util.Replica
-	context *pb.Context
 	set     crdt.Set
 	data    crdt.CRDT[F]
 }
@@ -20,23 +19,22 @@ func new[F crdt.Flavor](id util.Replica, g generator.Generator[F]) *replica[F] {
 	data := g.New(pb.DT_Set, id)
 	return &replica[F]{
 		id: id,
-		context: &pb.Context{},
 		set:  data.(crdt.Set),
 		data: data,
 	}
 }
 
-func (r *replica[_]) addRemove(add []string, rem []string) {
+func (r *replica[_]) addRemove(ctx *pb.Context, add []string, rem []string) {
 	n := int64(0)
 	for _, e := range add {
 		n++
-		r.set.Add(r.context, e)
-		r.context.Dvv = util.Sync(r.context.Dvv, r.data.Context().Dvv)
+		r.set.Add(ctx, e)
+		ctx.Dvv = util.Sync(ctx.Dvv, r.data.Context().Dvv)
 	}
 	for _, e := range rem {
 		n++
-		r.set.Remove(r.context, e)
-		r.context.Dvv = util.Sync(r.context.Dvv, r.data.Context().Dvv)
+		r.set.Remove(ctx, e)
+		ctx.Dvv = util.Sync(ctx.Dvv, r.data.Context().Dvv)
 	}
 }
 
@@ -59,9 +57,13 @@ func testSet[F crdt.Flavor](t *testing.T, g generator.Generator[F]) {
 	r2 := new(util.NewReplica("a", 2), g)
 	r3 := new(util.NewReplica("a", 3), g)
 
-	r1.addRemove([]string{"x", "y"}, nil)
-	r2.addRemove([]string{"x"}, []string{"x"})
-	r3.addRemove([]string{"z", "w"}, []string{"w"})
+	ctx := &pb.Context{}
+
+	r1.addRemove(ctx, []string{"x", "y"}, nil)
+	ctx = &pb.Context{}
+	r2.addRemove(ctx, []string{"x"}, []string{"x"})
+	ctx = &pb.Context{}
+	r3.addRemove(ctx, []string{"z", "w"}, []string{"w"})
 
 	assertEqual(t, "c1 initial val", r1.set.Value(), []string{"x", "y"}, setCompare)
 	assertEqual(t, "c2 initial val", r2.set.Value(), nil, setCompare)

@@ -109,8 +109,9 @@ message StateSet {
 }
 
 message DeltaSet {
-  map<string, Dots> elements = 1;
-  DVV dvv = 2;
+  map<string, Dots> add = 1;
+  map<string, Dots> rem = 2;
+  DVV DVV = 3;
 }
 
 message Dots {
