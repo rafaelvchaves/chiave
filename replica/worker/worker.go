@@ -13,13 +13,16 @@ import (
 	"google.golang.org/grpc"
 )
 
-const RPCTimeout = 10 * time.Second
+const (
+	rpcTimeout   = 10 * time.Second
+	requestEpoch = 50 * time.Millisecond
+	eventEpoch   = 50 * time.Millisecond
+)
 
 type Worker[F crdt.Flavor] struct {
 	replica     util.Replica
 	generator   generator.Generator[F]
 	kvs         Store[F]
-	contexts    map[string][]*pb.DVV
 	requests    chan ClientRequest
 	events      chan *pb.Event
 	hashRing    *consistent.Consistent
@@ -65,7 +68,7 @@ type ClientRequest struct {
 type Response = struct {
 	Value   string
 	Exists  bool
-	Context   *pb.Context
+	Context *pb.Context
 }
 
 func New[F crdt.Flavor](replica util.Replica, generator generator.Generator[F], logger *util.Logger) *Worker[F] {
@@ -73,7 +76,6 @@ func New[F crdt.Flavor](replica util.Replica, generator generator.Generator[F], 
 		generator:   generator,
 		replica:     replica,
 		kvs:         NewCache[F](),
-		contexts:    make(map[string][]*pb.DVV),
 		requests:    make(chan ClientRequest, 10000),
 		events:      make(chan *pb.Event, 10000),
 		hashRing:    util.GetHashRing(),
@@ -84,14 +86,14 @@ func New[F crdt.Flavor](replica util.Replica, generator generator.Generator[F], 
 }
 
 func (w *Worker[F]) Start() {
-	requestDeadline := 50 * time.Millisecond
 	for {
 		// set of keys modified in this epoch
 		changeset := util.NewSet[string]()
-		timeout := time.After(requestDeadline)
+		timeout := time.After(requestEpoch)
+
+		// phase 1: receive client requests and convert to events
 	reqLoop:
 		for {
-			// phase 1: receive client requests and convert to events
 			select {
 			case <-timeout:
 				break reqLoop
@@ -102,7 +104,8 @@ func (w *Worker[F]) Start() {
 				}
 			}
 		}
-		// phase 2: go through all affected keys and broadcast to other owners
+
+		// phase 2: go through all affected keys and broadcast to other replicas
 		changeset.Range(func(key string) bool {
 			v, ok := w.kvs.Get(key)
 			if !ok {
@@ -114,9 +117,10 @@ func (w *Worker[F]) Start() {
 			return true
 		})
 
-		timeout = time.After(requestDeadline)
+		// phase 3: receive events from other replicas
 	eventLoop:
 		for {
+			timeout := time.After(eventEpoch)
 			select {
 			case event := <-w.events:
 				v := w.kvs.GetOrDefault(event.Key, w.generator.New(event.Datatype, w.replica))
@@ -155,8 +159,8 @@ func (w *Worker[F]) process(r ClientRequest) {
 			value = v.String()
 		}
 		r.Response <- Response{
-			Value:   value,
-			Exists:  ok,
+			Value:  value,
+			Exists: ok,
 		}
 	case AddSet:
 		v := w.kvs.GetOrDefault(r.Key, w.generator.New(pb.DT_Set, w.replica))
@@ -195,9 +199,8 @@ func (w *Worker[F]) broadcast(event *pb.Event) {
 		}
 		event.Dest = int32(v.WorkerID)
 		client := pb.NewChiaveClient(w.connections[v.Addr])
-		ctx, cancel := context.WithTimeout(context.Background(), RPCTimeout)
+		ctx, cancel := context.WithTimeout(context.Background(), rpcTimeout)
 		defer cancel()
-		// w.logger.Infof("worker %d is sending %v to worker %d", w.replica.WorkerID, event.Data, v.WorkerID)
 		_, err := client.ProcessEvent(ctx, event)
 		if err != nil {
 			w.logger.Errorf("ProcessEvent from %s to %s: %v", w.replica.String(), v.String(), err)
