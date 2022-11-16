@@ -10,15 +10,15 @@ import (
 )
 
 type replica[F crdt.Flavor] struct {
-	id      util.Replica
-	set     crdt.Set
-	data    crdt.CRDT[F]
+	id   util.Replica
+	set  crdt.Set
+	data crdt.CRDT[F]
 }
 
 func new[F crdt.Flavor](id util.Replica, g generator.Generator[F]) *replica[F] {
 	data := g.New(pb.DT_Set, id)
 	return &replica[F]{
-		id: id,
+		id:   id,
 		set:  data.(crdt.Set),
 		data: data,
 	}
@@ -98,6 +98,6 @@ func TestOpSet(t *testing.T) {
 	testSet[crdt.Op](t, generator.Op{})
 }
 
-// func TestStateSet(t *testing.T) {
-// 	testSet[crdt.State](t, generator.State{})
-// }
+func TestStateSet(t *testing.T) {
+	testSet[crdt.State](t, generator.State{})
+}
