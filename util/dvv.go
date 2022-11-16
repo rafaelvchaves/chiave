@@ -7,6 +7,14 @@ import (
 	"golang.org/x/exp/constraints"
 )
 
+type Ord int
+
+const (
+	LT Ord = iota
+	GT
+	CC
+)
+
 func displayMap(m map[string]int64) string {
 	str := "{"
 	i := 0
@@ -28,36 +36,21 @@ func String(context ...*pb.DVV) string {
 	return str
 }
 
-// func dvvVals(dvv *pb.DVV) []string {
-// 	var result []string
-// 	result = append(result, dvv.Sibling)
-// 	for r := range dvv.Clock {
-// 		result = append(result, r)
-// 	}
-// 	return result
-// }
-
-// func values(D []*pb.DVV) []string {
-// 	var result []string
-// 	for _, dvv := range D {
-// 		result = append(result, dvvVals(dvv)...)
-// 	}
-// 	return result
-// }
-
-// func Reconcile(f func([]string) string, D []*pb.DVV, r string) *pb.DVV {
-// 	d := Join(D)
-// 	d.Sibling = f(values(D))
-// 	d.Dot = &pb.Dot{
-// 		Replica: r,
-// 		N:       ceil(D, r),
-// 	}
-// 	return d
-// }
-
-func Join(D []*pb.DVV) *pb.DVV {
+func Join(D ...*pb.DVV) *pb.DVV {
+	var r string
+	var N int64
+	for _, dvv := range D {
+		if dvv.Dot.N >= N {
+			r = dvv.Dot.Replica
+			N = dvv.Dot.N
+		}
+	}
 	result := &pb.DVV{
 		Clock: make(map[string]int64),
+		Dot: &pb.Dot{
+			Replica: r,
+			N:       N,
+		},
 	}
 	for _, i := range ids(D) {
 		result.Clock[i] = ceil(D, i)
@@ -65,42 +58,35 @@ func Join(D []*pb.DVV) *pb.DVV {
 	return result
 }
 
-func Lt(d1, d2 *pb.DVV) bool {
+func ContainedIn(dot *pb.Dot, dvv *pb.DVV) bool {
+	return dot.N < dvv.Clock[dot.Replica] || (dvv.Dot.Replica == dot.Replica && dot.N <= dvv.Dot.N)
+}
+
+func Compare(d1, d2 *pb.DVV) Ord {
+	if lt(d1, d2) {
+		return LT
+	} else if lt(d2, d1) {
+		return GT
+	}
+	return CC
+}
+
+func lt(d1, d2 *pb.DVV) bool {
+	if d1 == nil {
+		return true
+	}
 	dot := d1.Dot
 	return dot == nil || dot.N <= d2.Clock[dot.Replica]
 }
 
-func CC(d1, d2 *pb.DVV) bool {
-	return !Lt(d1, d2) && !Lt(d2, d1)
-}
-
-func Sync(D1, D2 []*pb.DVV) []*pb.DVV {
-	var result []*pb.DVV
-	for _, x := range D1 {
-		include := true
-		for _, y := range D2 {
-			if Lt(x, y) {
-				include = false
-				break
-			}
-		}
-		if include {
-			result = append(result, x)
-		}
+func Sync(d1, d2 *pb.DVV) *pb.DVV {
+	switch Compare(d1, d2) {
+	case GT:
+		return d1
+	case LT:
+		return d2
 	}
-	for _, x := range D2 {
-		include := true
-		for _, y := range D1 {
-			if Lt(x, y) {
-				include = false
-				break
-			}
-		}
-		if include {
-			result = append(result, x)
-		}
-	}
-	return result
+	return Join(d1, d2)
 }
 
 func dvvIDs(dvv *pb.DVV) []string {

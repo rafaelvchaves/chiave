@@ -42,6 +42,7 @@ type Proxy struct {
 	connections map[string]*grpc.ClientConn
 	hashRing    *consistent.Consistent
 	repFactor   int
+	context     *pb.Context
 }
 
 func NewProxy() *Proxy {
@@ -51,6 +52,7 @@ func NewProxy() *Proxy {
 		connections: util.GetConnections(),
 		hashRing:    util.GetHashRing(),
 		repFactor:   util.LoadConfig().RepFactor,
+		context:     &pb.Context{},
 	}
 	return p
 }
@@ -143,18 +145,14 @@ func (p *Proxy) AddSet(key ChiaveSet, element string) error {
 		client := pb.NewChiaveClient(p.connections[r.Addr])
 		ctx, cancel := context.WithTimeout(context.Background(), RPCTimeout)
 		defer cancel()
-		_, err := client.AddSet(ctx, &pb.Request{
+		res, err := client.AddSet(ctx, &pb.Request{
 			Key:      k,
 			WorkerId: int32(r.WorkerID),
 			Args:     []string{element},
-			Context: &pb.Context{
-				Dot: &pb.Dot{
-					Replica: p.id,
-					N:       p.seqNrs[k],
-				},
-			},
+			Context:  p.context,
 		})
 		if err == nil {
+			p.context.Dvv = util.Sync(p.context.Dvv, res.Context.Dvv)
 			return nil
 		}
 	}
@@ -173,18 +171,14 @@ func (p *Proxy) RemoveSet(key ChiaveSet, element string) error {
 		client := pb.NewChiaveClient(p.connections[r.Addr])
 		ctx, cancel := context.WithTimeout(context.Background(), RPCTimeout)
 		defer cancel()
-		_, err := client.RemoveSet(ctx, &pb.Request{
+		res, err := client.RemoveSet(ctx, &pb.Request{
 			Key:      k,
 			WorkerId: int32(r.WorkerID),
 			Args:     []string{element},
-			Context: &pb.Context{
-				Dot: &pb.Dot{
-					Replica: p.id,
-					N:       p.seqNrs[k],
-				},
-			},
+			Context:  p.context,
 		})
 		if err == nil {
+			p.context.Dvv = util.Sync(p.context.Dvv, res.Context.Dvv)
 			return nil
 		}
 	}

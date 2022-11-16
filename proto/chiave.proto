@@ -16,7 +16,7 @@ service Chiave {
 }
 
 message Response {
-  repeated DVV context = 1;
+  Context context = 1;
 }
 
 message Request {
