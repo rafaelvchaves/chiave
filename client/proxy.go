@@ -6,12 +6,12 @@ import (
 	pb "kvs/proto"
 	"kvs/util"
 	"math/rand"
+	"sync"
 	"time"
-
-	"github.com/google/uuid"
 
 	"github.com/buraksezer/consistent"
 	"google.golang.org/grpc"
+	"google.golang.org/protobuf/proto"
 )
 
 const (
@@ -37,18 +37,15 @@ func (c ChiaveSet) string() string {
 type ChiaveRegister string
 
 type Proxy struct {
-	id          string
-	seqNrs      map[string]int64
 	connections map[string]*grpc.ClientConn
 	hashRing    *consistent.Consistent
 	repFactor   int
 	context     *pb.Context
+	mu          sync.Mutex
 }
 
 func NewProxy() *Proxy {
 	p := &Proxy{
-		id:          uuid.New().String(),
-		seqNrs:      make(map[string]int64),
 		connections: util.GetConnections(),
 		hashRing:    util.GetHashRing(),
 		repFactor:   util.LoadConfig().RepFactor,
@@ -135,7 +132,6 @@ func (p *Proxy) Get(key Key) (string, error) {
 
 func (p *Proxy) AddSet(key ChiaveSet, element string) error {
 	k := key.string()
-	p.seqNrs[k]++
 	owners, err := p.ownersOf(k)
 	if err != nil {
 		return err
@@ -145,14 +141,19 @@ func (p *Proxy) AddSet(key ChiaveSet, element string) error {
 		client := pb.NewChiaveClient(p.connections[r.Addr])
 		ctx, cancel := context.WithTimeout(context.Background(), RPCTimeout)
 		defer cancel()
+		p.mu.Lock()
+		context := proto.Clone(p.context)
+		p.mu.Unlock()
 		res, err := client.AddSet(ctx, &pb.Request{
 			Key:      k,
 			WorkerId: int32(r.WorkerID),
 			Args:     []string{element},
-			Context:  p.context,
+			Context:  context.(*pb.Context),
 		})
 		if err == nil {
+			p.mu.Lock()
 			p.context.Dvv = util.Sync(p.context.Dvv, res.Context.Dvv)
+			p.mu.Unlock()
 			return nil
 		}
 	}
@@ -161,28 +162,34 @@ func (p *Proxy) AddSet(key ChiaveSet, element string) error {
 
 func (p *Proxy) RemoveSet(key ChiaveSet, element string) error {
 	k := key.string()
-	p.seqNrs[k]++
 	owners, err := p.ownersOf(k)
 	if err != nil {
 		return err
 	}
+	var lastError error
 	for _, owner := range owners {
 		r := owner.(util.Replica)
 		client := pb.NewChiaveClient(p.connections[r.Addr])
 		ctx, cancel := context.WithTimeout(context.Background(), RPCTimeout)
 		defer cancel()
+		p.mu.Lock()
+		context := proto.Clone(p.context)
+		p.mu.Unlock()
 		res, err := client.RemoveSet(ctx, &pb.Request{
 			Key:      k,
 			WorkerId: int32(r.WorkerID),
 			Args:     []string{element},
-			Context:  p.context,
+			Context:  context.(*pb.Context),
 		})
 		if err == nil {
+			p.mu.Lock()
 			p.context.Dvv = util.Sync(p.context.Dvv, res.Context.Dvv)
+			p.mu.Unlock()
 			return nil
 		}
+		lastError = err
 	}
-	return fmt.Errorf("failed to reach owners of key %q", key)
+	return fmt.Errorf("failed to reach owners of key %q, last error = %v", key, lastError)
 }
 
 func (p *Proxy) Cleanup() error {
