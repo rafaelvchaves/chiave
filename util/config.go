@@ -25,5 +25,6 @@ func LoadConfig() Config {
 	}
 	config := Config{}
 	json.Unmarshal([]byte(f), &config)
+	config.PartitionCount = config.WorkersPerServer * len(config.Addresses) * 3
 	return config
 }

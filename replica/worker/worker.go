@@ -2,6 +2,7 @@ package worker
 
 import (
 	"context"
+	"fmt"
 	"kvs/crdt"
 	"kvs/crdt/generator"
 	pb "kvs/proto"
@@ -14,11 +15,9 @@ import (
 )
 
 const (
-	rpcTimeout        = 10 * time.Second
-	requestEpoch      = 50 * time.Millisecond
-	eventEpoch        = 50 * time.Millisecond
-	requestBufferSize = 10000
-	eventBufferSize   = 10000
+	rpcTimeout   = 5 * time.Second
+	requestEpoch = 100 * time.Millisecond
+	eventEpoch   = 100 * time.Millisecond
 )
 
 type Worker[F crdt.Flavor] struct {
@@ -31,6 +30,7 @@ type Worker[F crdt.Flavor] struct {
 	connections map[string]*grpc.ClientConn
 	cfg         util.Config
 	logger      *util.Logger
+	workers     []*Worker[F]
 }
 
 type LeaderRequest struct {
@@ -44,7 +44,10 @@ type Response struct {
 	SetValue     []string
 }
 
-func New[F crdt.Flavor](replica util.Replica, generator generator.Generator[F], logger *util.Logger) *Worker[F] {
+func New[F crdt.Flavor](replica util.Replica, generator generator.Generator[F], logger *util.Logger, workers []*Worker[F]) *Worker[F] {
+	cfg := util.LoadConfig()
+	requestBufferSize := 100000
+	eventBufferSize := 100000
 	return &Worker[F]{
 		generator:   generator,
 		replica:     replica,
@@ -53,55 +56,74 @@ func New[F crdt.Flavor](replica util.Replica, generator generator.Generator[F], 
 		events:      make(chan *pb.Event, eventBufferSize),
 		hashRing:    util.GetHashRing(),
 		connections: util.GetConnections(),
-		cfg:         util.LoadConfig(),
+		cfg:         cfg,
 		logger:      logger,
+		workers:     workers,
 	}
 }
 
 func (w *Worker[F]) Start() {
 	for {
 		// set of keys modified in this epoch
-		changeset := util.NewSet[string]()
-		timeout := time.After(requestEpoch)
-
+		changeset := make(map[string]struct{})
 		// phase 1: receive client requests and convert to events
+		requestsProcessed := 0
+		eventsProcessed := 0
+		wid := 3
 	reqLoop:
-		for {
+		for timeout := time.After(requestEpoch); ; {
 			select {
 			case <-timeout:
 				break reqLoop
 			case req := <-w.requests:
+				requestsProcessed++
+				if w.replica.WorkerID == wid && len(w.requests) > 0 {
+					fmt.Printf("request buffer size: %d\n", len(w.requests))
+				}
 				w.process(req)
-				if req.Inner.Operation == pb.OP_GETCOUNTER || req.Inner.Operation == pb.OP_GETSET {
-					changeset.Add(req.Inner.Key)
+				if req.Inner.Operation != pb.OP_GETCOUNTER && req.Inner.Operation != pb.OP_GETSET {
+					changeset[req.Inner.Key] = struct{}{}
 				}
 			}
 		}
 
 		// phase 2: go through all affected keys and broadcast to other replicas
-		changeset.Range(func(key string) bool {
+		for key := range changeset {
 			v, ok := w.kvs.Get(key)
 			if !ok {
-				return true
+				continue
 			}
 			e := v.PrepareEvent()
 			e.Key = key
 			w.broadcast(e)
-			return true
-		})
+		}
+		if w.replica.WorkerID == wid && len(changeset) > 0 {
+			fmt.Printf("%d events sent\n", len(changeset)*(w.cfg.RepFactor-1))
+		}
 
 		// phase 3: receive events from other replicas
 	eventLoop:
-		for {
-			timeout := time.After(eventEpoch)
+		for timeout := time.After(eventEpoch); ; {
 			select {
+			case <-timeout:
+				break eventLoop
 			case event := <-w.events:
+				eventsProcessed++
+				// if w.replica.WorkerID == wid {
+				// 	fmt.Printf("event buffer size: %d\n", len(w.events))
+				// }
 				v := w.kvs.GetOrDefault(event.Key, w.generator.New(event.Datatype, w.replica))
 				v.PersistEvent(event)
 				w.kvs.Put(event.Key, v)
-			case <-timeout:
+			default:
 				break eventLoop
 			}
+		}
+		if requestsProcessed > 0 && w.replica.WorkerID == wid {
+			fmt.Printf("worker %d requests processed: %d\n", w.replica.WorkerID, requestsProcessed)
+		}
+		if eventsProcessed > 0 && w.replica.WorkerID == wid {
+			fmt.Printf("worker %d events processed: %d\n", w.replica.WorkerID, eventsProcessed)
 		}
 	}
 }
@@ -178,6 +200,10 @@ func (w *Worker[F]) broadcast(event *pb.Event) {
 	for _, o := range owners {
 		v := o.(util.Replica)
 		if v == w.replica {
+			continue
+		}
+		if v.Addr == w.replica.Addr {
+			w.workers[v.WorkerID].PutEvent(event)
 			continue
 		}
 		event.Dest = int32(v.WorkerID)

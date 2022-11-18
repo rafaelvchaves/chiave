@@ -23,18 +23,18 @@ func NewLogger(filename string) (*Logger, error) {
 }
 
 func (l *Logger) Infof(format string, args ...any) {
-	l.iLogger.Printf(format, args...)
+	// l.iLogger.Printf(format, args...)
 }
 
 func (l *Logger) Warningf(format string, args ...any) {
-	l.wLogger.Printf(format, args...)
+	// l.wLogger.Printf(format, args...)
 }
 
 func (l *Logger) Errorf(format string, args ...any) {
-	l.eLogger.Printf(format, args...)
+	// l.eLogger.Printf(format, args...)
 }
 
 func (l *Logger) Fatalf(format string, args ...any) {
-	l.fLogger.Printf(format, args...)
-	os.Exit(1)
+	// l.fLogger.Printf(format, args...)
+	// os.Exit(1)
 }

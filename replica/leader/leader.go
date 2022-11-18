@@ -67,7 +67,7 @@ func leaderWithFlavor[F crdt.Flavor](addr string, g generator.Generator[F]) *lea
 	workers := make([]*worker.Worker[F], cfg.WorkersPerServer)
 	for i := 0; i < cfg.WorkersPerServer; i++ {
 		r := util.NewReplica(addr, i)
-		workers[i] = worker.New(r, g, l)
+		workers[i] = worker.New(r, g, l, workers)
 	}
 	return &leader[F]{
 		addr:    addr,
