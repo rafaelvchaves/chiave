@@ -1,0 +1,24 @@
+latency,throughput
+164299,1000
+154341,2000
+152059,3000
+169361,4000
+154680,5000
+163306,6000
+149791,7000
+158487,8000
+154780,9000
+161283,10000
+157425,20000
+165022,30000
+25141063,40000
+34327600,50000
+37306751,60000
+45003465,70000
+46568483,80000
+58126272,90000
+70613431,100000
+168912762,200000
+failed to reach owners of key "125059", last error = rpc error: code = DeadlineExceeded desc = context deadline exceeded
+failed to reach owners of key "356403", last error = rpc error: code = DeadlineExceeded desc = context deadline exceeded
+failed to reach owners of key "26579", last error = rpc error: code = DeadlineExceeded desc = context deadline exceeded
