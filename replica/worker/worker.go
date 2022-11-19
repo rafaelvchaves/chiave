@@ -2,7 +2,6 @@ package worker
 
 import (
 	"context"
-	"fmt"
 	"kvs/crdt"
 	"kvs/crdt/generator"
 	pb "kvs/proto"
@@ -69,7 +68,7 @@ func (w *Worker[F]) Start() {
 		// phase 1: receive client requests and convert to events
 		requestsProcessed := 0
 		eventsProcessed := 0
-		wid := 3
+		// wid := 3
 	reqLoop:
 		for timeout := time.After(requestEpoch); ; {
 			select {
@@ -77,9 +76,9 @@ func (w *Worker[F]) Start() {
 				break reqLoop
 			case req := <-w.requests:
 				requestsProcessed++
-				if w.replica.WorkerID == wid && len(w.requests) > 0 {
-					fmt.Printf("request buffer size: %d\n", len(w.requests))
-				}
+				// if w.replica.WorkerID == wid && len(w.requests) > 0 {
+				// 	fmt.Printf("request buffer size: %d\n", len(w.requests))
+				// }
 				w.process(req)
 				if req.Inner.Operation != pb.OP_GETCOUNTER && req.Inner.Operation != pb.OP_GETSET {
 					changeset[req.Inner.Key] = struct{}{}
@@ -97,9 +96,9 @@ func (w *Worker[F]) Start() {
 			e.Key = key
 			w.broadcast(e)
 		}
-		if w.replica.WorkerID == wid && len(changeset) > 0 {
-			fmt.Printf("%d events sent\n", len(changeset)*(w.cfg.RepFactor-1))
-		}
+		// if w.replica.WorkerID == wid && len(changeset) > 0 {
+		// 	fmt.Printf("%d events sent\n", len(changeset)*(w.cfg.RepFactor-1))
+		// }
 
 		// phase 3: receive events from other replicas
 	eventLoop:
@@ -119,12 +118,12 @@ func (w *Worker[F]) Start() {
 				break eventLoop
 			}
 		}
-		if requestsProcessed > 0 && w.replica.WorkerID == wid {
-			fmt.Printf("worker %d requests processed: %d\n", w.replica.WorkerID, requestsProcessed)
-		}
-		if eventsProcessed > 0 && w.replica.WorkerID == wid {
-			fmt.Printf("worker %d events processed: %d\n", w.replica.WorkerID, eventsProcessed)
-		}
+		// if requestsProcessed > 0 && w.replica.WorkerID == wid {
+		// 	fmt.Printf("worker %d requests processed: %d\n", w.replica.WorkerID, requestsProcessed)
+		// }
+		// if eventsProcessed > 0 && w.replica.WorkerID == wid {
+		// 	fmt.Printf("worker %d events processed: %d\n", w.replica.WorkerID, eventsProcessed)
+		// }
 	}
 }
 
