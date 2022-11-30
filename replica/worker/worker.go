@@ -14,8 +14,8 @@ import (
 )
 
 const (
-	rpcTimeout   = 5 * time.Second
-	requestEpoch = 100 * time.Millisecond
+	rpcTimeout   = 10 * time.Second
+	requestEpoch = 10 * time.Millisecond
 	eventEpoch   = 100 * time.Millisecond
 )
 
@@ -65,65 +65,30 @@ func (w *Worker[F]) Start() {
 	for {
 		// set of keys modified in this epoch
 		changeset := make(map[string]struct{})
-		// phase 1: receive client requests and convert to events
-		requestsProcessed := 0
-		eventsProcessed := 0
-		// wid := 3
-	reqLoop:
-		for timeout := time.After(requestEpoch); ; {
+		for timeout := time.After(eventEpoch); ; {
 			select {
-			case <-timeout:
-				break reqLoop
 			case req := <-w.requests:
-				requestsProcessed++
-				// if w.replica.WorkerID == wid && len(w.requests) > 0 {
-				// 	fmt.Printf("request buffer size: %d\n", len(w.requests))
-				// }
 				w.process(req)
 				if req.Inner.Operation != pb.OP_GETCOUNTER && req.Inner.Operation != pb.OP_GETSET {
 					changeset[req.Inner.Key] = struct{}{}
 				}
-			}
-		}
-
-		// phase 2: go through all affected keys and broadcast to other replicas
-		for key := range changeset {
-			v, ok := w.kvs.Get(key)
-			if !ok {
-				continue
-			}
-			e := v.PrepareEvent()
-			e.Key = key
-			w.broadcast(e)
-		}
-		// if w.replica.WorkerID == wid && len(changeset) > 0 {
-		// 	fmt.Printf("%d events sent\n", len(changeset)*(w.cfg.RepFactor-1))
-		// }
-
-		// phase 3: receive events from other replicas
-	eventLoop:
-		for timeout := time.After(eventEpoch); ; {
-			select {
-			case <-timeout:
-				break eventLoop
 			case event := <-w.events:
-				eventsProcessed++
-				// if w.replica.WorkerID == wid {
-				// 	fmt.Printf("event buffer size: %d\n", len(w.events))
-				// }
 				v := w.kvs.GetOrDefault(event.Key, w.generator.New(event.Datatype, w.replica))
 				v.PersistEvent(event)
 				w.kvs.Put(event.Key, v)
-			default:
-				break eventLoop
+			case <-timeout:
+				for key := range changeset {
+					v, ok := w.kvs.Get(key)
+					if !ok {
+						continue
+					}
+					e := v.PrepareEvent()
+					e.Key = key
+					w.broadcast(e)
+				}
+				changeset = make(map[string]struct{})
 			}
 		}
-		// if requestsProcessed > 0 && w.replica.WorkerID == wid {
-		// 	fmt.Printf("worker %d requests processed: %d\n", w.replica.WorkerID, requestsProcessed)
-		// }
-		// if eventsProcessed > 0 && w.replica.WorkerID == wid {
-		// 	fmt.Printf("worker %d events processed: %d\n", w.replica.WorkerID, eventsProcessed)
-		// }
 	}
 }
 
