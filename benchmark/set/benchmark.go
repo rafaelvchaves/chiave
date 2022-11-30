@@ -14,7 +14,7 @@ func measureLatency(proxy *client.Proxy, n int) float64 {
 	var latencies []time.Duration
 	for i := 0; i < n; i++ {
 		now := time.Now()
-		if err := proxy.RemoveSet(client.ChiaveSet(fmt.Sprint(i)), fmt.Sprint(i)); err != nil {
+		if err := proxy.RemoveSet(client.ChiaveSet(fmt.Sprint(i%1000)), fmt.Sprint(i)); err != nil {
 			fmt.Println(err)
 			os.Exit(1)
 		}
@@ -65,16 +65,12 @@ func main() {
 	default:
 		go measureThroughput(proxy, *nops, *nSeconds)
 		nSamples := 30
+		time.Sleep(time.Duration(*nSeconds/2) * time.Second)
 		for i := 0; i < nSamples; i++ {
-			latency := measureLatency(proxy, 200)
+			latency := measureLatency(proxy, 100)
 			latencies = append(latencies, latency)
-			time.Sleep(time.Duration(*nSeconds / nSamples))
 		}
 		mu := mean(latencies)
-		// variance := variance(latencies, mu)
-		// width := 1.96 * math.Sqrt(variance/float64(len(latencies)))
-		// lower := mu - width
-		// upper := mu + width
 		fmt.Printf("%d,%d\n", int64(mu), *nops)
 	}
 }

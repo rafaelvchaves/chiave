@@ -6,8 +6,8 @@ for ((d = 0; d < 3; d++)) do
 		if [[ $NOPS -gt 500000 ]]; then
 			break
 		fi
-		go run benchmark.go -mode a -nops $NOPS >> results_${TYPE}.csv
-		sleep 4
+		go run benchmark.go -mode a -nsec 5 -nops $NOPS >> results_${TYPE}.csv
+		read -n 1 -p "continue?: " 
 	done
 done
 
