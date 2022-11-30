@@ -27,9 +27,10 @@ func measureLatency(proxy *client.Proxy, n int) float64 {
 	return float64(latencies[int(.95*float64(len(latencies)))].Nanoseconds())
 }
 
-func measureThroughput(proxy *client.Proxy, n int, nSeconds int) {
-	for i := 0; i < nSeconds; i++ {
-		var wg sync.WaitGroup
+func measureThroughput(proxy *client.Proxy, n int, nSeconds int, stop chan bool, done chan bool) {
+	var wg sync.WaitGroup
+	stop <- false
+	for !<-stop {
 		loopStart := time.Now()
 		for i := 0; i < n; i++ {
 			wg.Add(1)
@@ -44,9 +45,9 @@ func measureThroughput(proxy *client.Proxy, n int, nSeconds int) {
 		wg.Wait()
 		t := time.Since(loopStart)
 		<-time.After(time.Second - t)
-		// throughput := math.Ceil(float64(n) / time.Since(loopStart).Seconds())
-		// fmt.Println(int(throughput))
+		stop <- false
 	}
+	done <- true
 }
 
 func main() {
@@ -55,24 +56,49 @@ func main() {
 	mode := flag.String("mode", "t", "t/l")
 	flag.Parse()
 	proxy := client.NewProxy()
-	var latencies []float64
 	defer proxy.Cleanup()
+	var latencies []float64
 	switch *mode {
 	case "l":
-		measureLatency(proxy, *nops)
-	case "t":
-		measureThroughput(proxy, *nops, *nSeconds)
-	default:
-		go measureThroughput(proxy, *nops, *nSeconds)
-		nSamples := 30
-		time.Sleep(time.Duration(*nSeconds/2) * time.Second)
+		nSamples := 15
 		for i := 0; i < nSamples; i++ {
-			latency := measureLatency(proxy, 100)
+			latency := measureLatency(proxy, 50)
 			latencies = append(latencies, latency)
 		}
 		mu := mean(latencies)
+		fmt.Println(int64(mu))
+	case "t":
+		// measureThroughput(proxy, *nops, *nSeconds)
+	default:
+		stop := make(chan bool, 2)
+		// doneMap := sync.Map{}
+		// doneMap.Store("done", false)
+		done := make(chan bool, 1)
+		go measureThroughput(proxy, *nops, *nSeconds, stop, done)
+		nSamples := 5
+		time.Sleep(2 * time.Second)
+		p2 := client.NewProxy()
+		defer p2.Cleanup()
+		for i := 0; i < nSamples; i++ {
+			latency := measureLatency(p2, 500)
+			latencies = append(latencies, latency)
+			fmt.Printf("latency: %f\n", latency)
+		}
+		mu := median(latencies)
+		fmt.Println(latencies)
 		fmt.Printf("%d,%d\n", int64(mu), *nops)
+		// doneMap.Store("done", true)
+		// fmt.Println(doneMap.Load("done"))
+		stop <- true
+		<-done
 	}
+}
+
+func median(lst []float64) float64 {
+	sort.Slice(lst, func(i, j int) bool {
+		return lst[i] < lst[j]
+	})
+	return lst[int(.5*float64(len(lst)))]
 }
 
 func mean(lst []float64) float64 {
