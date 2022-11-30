@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	RPCTimeout = 5 * time.Second
+	RPCTimeout = 10 * time.Second
 )
 
 type Key interface {
