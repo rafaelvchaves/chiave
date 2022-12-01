@@ -2,6 +2,7 @@ package worker
 
 import (
 	"context"
+	"fmt"
 	"kvs/crdt"
 	"kvs/crdt/generator"
 	pb "kvs/proto"
@@ -62,32 +63,36 @@ func New[F crdt.Flavor](replica util.Replica, generator generator.Generator[F], 
 }
 
 func (w *Worker[F]) Start() {
-	for {
-		// set of keys modified in this epoch
-		changeset := make(map[string]struct{})
-		for timeout := time.After(eventEpoch); ; {
-			select {
-			case req := <-w.requests:
-				w.process(req)
-				if req.Inner.Operation != pb.OP_GETCOUNTER && req.Inner.Operation != pb.OP_GETSET {
-					changeset[req.Inner.Key] = struct{}{}
+	// set of keys modified in this epoch
+	changeset := make(map[string]struct{})
+	for timeout := time.After(eventEpoch); ; {
+		select {
+		case <-timeout:
+			fmt.Println("timeout")
+
+			for key := range changeset {
+				v, ok := w.kvs.Get(key)
+				if !ok {
+					continue
 				}
-			case event := <-w.events:
-				v := w.kvs.GetOrDefault(event.Key, w.generator.New(event.Datatype, w.replica))
-				v.PersistEvent(event)
-				w.kvs.Put(event.Key, v)
-			case <-timeout:
-				for key := range changeset {
-					v, ok := w.kvs.Get(key)
-					if !ok {
-						continue
-					}
-					e := v.PrepareEvent()
-					e.Key = key
-					w.broadcast(e)
-				}
-				changeset = make(map[string]struct{})
+				e := v.PrepareEvent()
+				e.Key = key
+				w.broadcast(e)
 			}
+			changeset = make(map[string]struct{})
+			timeout = time.After(eventEpoch)
+		case req := <-w.requests:
+			fmt.Println("handling incoming request")
+
+			w.process(req)
+			if req.Inner.Operation != pb.OP_GETCOUNTER && req.Inner.Operation != pb.OP_GETSET {
+				changeset[req.Inner.Key] = struct{}{}
+			}
+		case event := <-w.events:
+			fmt.Println("handling incoming event")
+			v := w.kvs.GetOrDefault(event.Key, w.generator.New(event.Datatype, w.replica))
+			v.PersistEvent(event)
+			w.kvs.Put(event.Key, v)
 		}
 	}
 }

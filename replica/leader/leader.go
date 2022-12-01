@@ -11,6 +11,7 @@ import (
 	"kvs/util"
 	"net"
 
+	"github.com/pkg/profile"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
@@ -135,6 +136,7 @@ func (l *leader[_]) Write(ctx context.Context, in *pb.Request) (*pb.Response, er
 }
 
 func main() {
+	defer profile.Start(profile.ProfilePath(".")).Stop()
 	addr := flag.String("ip", util.LoadConfig().Addresses[0], "ip address to start leader at")
 	flavor := flag.String("crdt", "op", "CRDT flavor (op, state, delta)")
 	flag.Parse()
