@@ -79,11 +79,15 @@ func (p *Proxy) writeSync(key string, op pb.OP, args ...string) error {
 		p.mu.Lock()
 		context := proto.Clone(p.context)
 		p.mu.Unlock()
+		var arg string
+		if len(args) > 0 {
+			arg = args[0]
+		}
 		res, err := client.Write(ctx, &pb.Request{
 			Key:       key,
 			WorkerId:  int32(r.WorkerID),
 			Operation: op,
-			Args:      args,
+			Arg:       arg,
 			Context:   context.(*pb.Context),
 		})
 		if err == nil {
@@ -108,11 +112,15 @@ func (p *Proxy) writeAsync(key string, op pb.OP, args ...string) error {
 		client := pb.NewChiaveClient(p.connections[r.Addr])
 		ctx, cancel := context.WithTimeout(context.Background(), RPCTimeout)
 		defer cancel()
+		var arg string
+		if len(args) > 0 {
+			arg = args[0]
+		}
 		_, err := client.Write(ctx, &pb.Request{
 			Key:       key,
 			WorkerId:  int32(r.WorkerID),
 			Operation: op,
-			Args:      args,
+			Arg:       arg,
 		})
 		if err == nil {
 			return nil

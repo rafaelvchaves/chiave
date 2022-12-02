@@ -30,7 +30,7 @@ message Request {
   string key = 1;
   int32 worker_id = 2;
   OP operation = 3;
-  repeated string args = 4;
+  string arg = 4;
   Context context = 5;
 }
 
