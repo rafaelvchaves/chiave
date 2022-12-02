@@ -6,6 +6,7 @@ import (
 	pb "kvs/proto"
 	"kvs/util"
 	"math/rand"
+	"sort"
 	"sync"
 	"time"
 
@@ -201,6 +202,57 @@ func (p *Proxy) GetSet(key ChiaveSet) ([]string, error) {
 		lastError = err
 	}
 	return nil, fmt.Errorf("failed to reach owners of key %q, last error = %v", key, lastError)
+}
+
+func compareSlice(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	sort.Slice(a, func(i, j int) bool { return a[i] < a[j] })
+	sort.Slice(b, func(i, j int) bool { return b[i] < b[j] })
+	for i, v := range a {
+		if v != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
+func (p *Proxy) GetConvergenceTime(key string, expected []string) (time.Duration, error) {
+	owners, err := p.ownersOf(key)
+	if err != nil {
+		return 0, err
+	}
+	var wg sync.WaitGroup
+	now := time.Now()
+	for _, owner := range owners {
+		wg.Add(1)
+		r := owner.(util.Replica)
+		client := pb.NewChiaveClient(p.connections[r.Addr])
+		go func(client pb.ChiaveClient, workerID int32) {
+			for {
+				ctx, cancel := context.WithTimeout(context.Background(), RPCTimeout)
+				defer cancel()
+				res, err := client.GetSet(ctx, &pb.Request{
+					Key:       key,
+					WorkerId:  workerID,
+					Operation: pb.OP_GETSET,
+				})
+				if err != nil {
+					fmt.Printf("error: %v", err)
+					continue
+				}
+				if !compareSlice(res.Value, expected) {
+					fmt.Printf("expected %v, got %v\n", expected, res.Value)
+					continue
+				}
+				break
+			}
+			wg.Done()
+		}(client, int32(r.WorkerID))
+	}
+	wg.Wait()
+	return time.Since(now), nil
 }
 
 func (p *Proxy) Cleanup() error {

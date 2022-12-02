@@ -6,9 +6,28 @@ import (
 	"kvs/client"
 	"os"
 	"sort"
+	"strconv"
 	"sync"
 	"time"
+
+	"golang.org/x/exp/constraints"
 )
+
+func measureConvergenceTime(proxy *client.Proxy) time.Duration {
+	setKey := client.ChiaveSet("set_key")
+	var expected []string
+	for i := 0; i < 20; i++ {
+		element := strconv.Itoa(i)
+		proxy.AddSet(setKey, element)
+		expected = append(expected, element)
+	}
+	t, err := proxy.GetConvergenceTime("set_key", expected)
+	if err != nil {
+		fmt.Println(err)
+		return 0
+	}
+	return t
+}
 
 func measureLatency(proxy *client.Proxy, n int) float64 {
 	var latencies []time.Duration
@@ -57,22 +76,28 @@ func main() {
 	flag.Parse()
 	proxy := client.NewProxy()
 	defer proxy.Cleanup()
-	var latencies []float64
 	switch *mode {
-	case "l":
-		nSamples := 15
-		for i := 0; i < nSamples; i++ {
-			latency := measureLatency(proxy, 50)
-			latencies = append(latencies, latency)
-		}
-		mu := mean(latencies)
-		fmt.Println(int64(mu))
-	case "t":
-		// measureThroughput(proxy, *nops, *nSeconds)
-	default:
+	case "c":
+		var cts []time.Duration
 		stop := make(chan bool, 2)
-		// doneMap := sync.Map{}
-		// doneMap.Store("done", false)
+		done := make(chan bool, 1)
+		go measureThroughput(proxy, *nops, *nSeconds, stop, done)
+		nSamples := 5
+		time.Sleep(2 * time.Second)
+		p2 := client.NewProxy()
+		defer p2.Cleanup()
+		for i := 0; i < nSamples; i++ {
+			ct := measureConvergenceTime(p2)
+			cts = append(cts, ct)
+			fmt.Printf("convergence time: %v\n", ct)
+		}
+		mu := median(cts)
+		fmt.Printf("%d,%d\n", int64(mu), *nops)
+		stop <- true
+		<-done
+	default:
+		var latencies []float64
+		stop := make(chan bool, 2)
 		done := make(chan bool, 1)
 		go measureThroughput(proxy, *nops, *nSeconds, stop, done)
 		nSamples := 5
@@ -87,24 +112,22 @@ func main() {
 		mu := median(latencies)
 		fmt.Println(latencies)
 		fmt.Printf("%d,%d\n", int64(mu), *nops)
-		// doneMap.Store("done", true)
-		// fmt.Println(doneMap.Load("done"))
 		stop <- true
 		<-done
 	}
 }
 
-func median(lst []float64) float64 {
+func median[T constraints.Ordered](lst []T) T {
 	sort.Slice(lst, func(i, j int) bool {
 		return lst[i] < lst[j]
 	})
 	return lst[int(.5*float64(len(lst)))]
 }
 
-func mean(lst []float64) float64 {
-	sum := float64(0)
-	for _, l := range lst {
-		sum += l
-	}
-	return sum / float64(len(lst))
-}
+// func mean(lst []float64) float64 {
+// 	sum := float64(0)
+// 	for _, l := range lst {
+// 		sum += l
+// 	}
+// 	return sum / float64(len(lst))
+// }
