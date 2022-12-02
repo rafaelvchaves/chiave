@@ -5,8 +5,6 @@ import (
 	"kvs/crdt"
 	pb "kvs/proto"
 	"kvs/util"
-
-	"github.com/google/uuid"
 )
 
 var _ crdt.Set = &Set{}
@@ -37,7 +35,12 @@ func NewSet(replica util.Replica) *Set {
 }
 
 func (s *Set) Add(ctx *pb.Context, e string) {
-	u := uuid.New().String()
+	var u string
+	if ctx.Dvv == nil || ctx.Dvv.Dot == nil {
+		u = (&pb.Dot{N: 0, Replica: s.replica.String()}).String()
+	} else {
+		u = ctx.Dvv.Dot.String()
+	}
 	s.elements[e] = append(s.elements[e], u)
 	eventData := s.current.GetOpSet()
 	eventData.Operations = append(eventData.Operations, &pb.SetOperation{
