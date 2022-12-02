@@ -74,7 +74,7 @@ func (w *Worker[F]) Start() {
 				}
 				e := v.PrepareEvent()
 				e.Key = key
-				// w.broadcast(e)
+				go w.broadcast(e)
 			}
 			changeset = make(map[string]struct{})
 			timeout = time.After(eventEpoch)
@@ -93,7 +93,7 @@ func (w *Worker[F]) Start() {
 
 func (w *Worker[F]) process(req LeaderRequest) {
 	r := req.Inner
-	w.logRequestHandle(r.Key, r.Operation, r.Args)
+	w.logRequestHandle(r.Key, r.Operation, r.Arg)
 	switch r.Operation {
 	case pb.OP_INCREMENT:
 		v := w.kvs.GetOrDefault(r.Key, w.generator.New(pb.DT_Counter, w.replica))
@@ -126,7 +126,7 @@ func (w *Worker[F]) process(req LeaderRequest) {
 		if !ok {
 			return
 		}
-		set.Add(r.Context, r.Args[0])
+		set.Add(r.Context, r.Arg)
 		w.kvs.Put(r.Key, v)
 		req.Response <- Response{
 			Context: v.Context(),
@@ -137,7 +137,7 @@ func (w *Worker[F]) process(req LeaderRequest) {
 		if !ok {
 			return
 		}
-		set.Remove(r.Context, r.Args[0])
+		set.Remove(r.Context, r.Arg)
 		w.kvs.Put(r.Key, v)
 		req.Response <- Response{
 			Context: v.Context(),
@@ -180,8 +180,8 @@ func (w *Worker[F]) broadcast(event *pb.Event) {
 	}
 }
 
-func (w *Worker[F]) logRequestHandle(key string, o pb.OP, args []string) {
-	w.logger.Infof("worker %d handling %s(%v) on key %q", w.replica.WorkerID, o.String(), args, key)
+func (w *Worker[F]) logRequestHandle(key string, o pb.OP, arg string) {
+	w.logger.Infof("worker %d handling %s(%s) on key %q", w.replica.WorkerID, o.String(), arg, key)
 }
 
 func (w *Worker[_]) PutRequest(r LeaderRequest) {
