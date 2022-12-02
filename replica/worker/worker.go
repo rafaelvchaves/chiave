@@ -14,8 +14,7 @@ import (
 )
 
 const (
-	rpcTimeout   = 10 * time.Second
-	requestEpoch = 10 * time.Millisecond
+	rpcTimeout = 10 * time.Second
 )
 
 type Worker[F crdt.Flavor] struct {
