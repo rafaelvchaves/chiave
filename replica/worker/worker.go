@@ -2,6 +2,7 @@ package worker
 
 import (
 	"context"
+	"fmt"
 	"kvs/crdt"
 	"kvs/crdt/generator"
 	pb "kvs/proto"
@@ -166,6 +167,7 @@ func (w *Worker[F]) broadcast(event *pb.Event) {
 			continue
 		}
 		if v.Addr == w.replica.Addr {
+			fmt.Println("other worker is at same address")
 			w.workers[v.WorkerID].PutEvent(event)
 			continue
 		}
