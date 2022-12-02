@@ -14,17 +14,19 @@ var cfg = LoadConfig()
 type Replica struct {
 	Addr     string
 	WorkerID int
+	name     string
 }
 
 func NewReplica(addr string, workerID int) Replica {
 	return Replica{
 		Addr:     addr,
 		WorkerID: workerID,
+		name:     fmt.Sprintf("%s#%d", addr, workerID),
 	}
 }
 
 func (r Replica) String() string {
-	return fmt.Sprintf("%s#%d", r.Addr, r.WorkerID)
+	return r.name
 }
 
 type hasher struct{}

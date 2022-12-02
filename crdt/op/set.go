@@ -5,6 +5,8 @@ import (
 	"kvs/crdt"
 	pb "kvs/proto"
 	"kvs/util"
+	"strconv"
+	"strings"
 )
 
 var _ crdt.Set = &Set{}
@@ -36,13 +38,22 @@ func NewSet(replica util.Replica) *Set {
 	}
 }
 
+func dotToString(dot *pb.Dot) string {
+	var sb strings.Builder
+	sb.WriteString(dot.Replica)
+	sb.WriteString(",")
+	sb.WriteString(strconv.FormatInt(dot.N, 10))
+	return sb.String()
+}
+
 func (s *Set) Add(ctx *pb.Context, e string) {
-	var u string
+	var dot *pb.Dot
 	if ctx.Dvv == nil || ctx.Dvv.Dot == nil {
-		u = (&pb.Dot{N: 0, Replica: s.replicaName}).String()
+		dot = &pb.Dot{N: 0, Replica: s.replicaName}
 	} else {
-		u = ctx.Dvv.Dot.String()
+		dot = ctx.Dvv.Dot
 	}
+	u := dotToString(dot)
 	s.elements[e] = append(s.elements[e], u)
 	eventData := s.current.GetOpSet()
 	eventData.Operations = append(eventData.Operations, &pb.SetOperation{
