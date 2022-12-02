@@ -136,10 +136,13 @@ func (l *leader[_]) Write(ctx context.Context, in *pb.Request) (*pb.Response, er
 }
 
 func main() {
-	defer profile.Start(profile.ProfilePath(".")).Stop()
+	prof := flag.Bool("prof", false, "whether to run pprof")
 	addr := flag.String("ip", util.LoadConfig().Addresses[0], "ip address to start leader at")
 	flavor := flag.String("crdt", "op", "CRDT flavor (op, state, delta)")
 	flag.Parse()
+	if *prof {
+		defer profile.Start(profile.ProfilePath(".")).Stop()
+	}
 	f := fromString[*flavor]
 	fmt.Printf("using %s CRDTs\n", toString[f])
 	leader := NewLeader(*addr, f)
