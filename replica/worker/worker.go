@@ -74,7 +74,7 @@ func (w *Worker[F]) Start() {
 				}
 				e := v.PrepareEvent()
 				e.Key = key
-				w.broadcast(e)
+				// w.broadcast(e)
 			}
 			changeset = make(map[string]struct{})
 			timeout = time.After(eventEpoch)
