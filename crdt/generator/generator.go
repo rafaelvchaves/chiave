@@ -7,10 +7,12 @@ import (
 	"kvs/crdt/state"
 	pb "kvs/proto"
 	"kvs/util"
+	"time"
 )
 
 type Generator[F crdt.Flavor] interface {
 	New(pb.DT, util.Replica) crdt.CRDT[F]
+	BroadcastEpoch() time.Duration
 }
 
 type Delta struct{}
@@ -24,6 +26,10 @@ func (Delta) New(dt pb.DT, r util.Replica) crdt.CRDT[crdt.Delta] {
 	}
 }
 
+func (Delta) BroadcastEpoch() time.Duration {
+	return 1000 * time.Millisecond
+}
+
 type Op struct{}
 
 func (Op) New(dt pb.DT, r util.Replica) crdt.CRDT[crdt.Op] {
@@ -35,6 +41,10 @@ func (Op) New(dt pb.DT, r util.Replica) crdt.CRDT[crdt.Op] {
 	}
 }
 
+func (Op) BroadcastEpoch() time.Duration {
+	return 100 * time.Millisecond
+}
+
 type State struct{}
 
 func (State) New(dt pb.DT, r util.Replica) crdt.CRDT[crdt.State] {
@@ -44,4 +54,8 @@ func (State) New(dt pb.DT, r util.Replica) crdt.CRDT[crdt.State] {
 	default:
 		return state.NewSet(r)
 	}
+}
+
+func (State) BroadcastEpoch() time.Duration {
+	return 1000 * time.Millisecond
 }

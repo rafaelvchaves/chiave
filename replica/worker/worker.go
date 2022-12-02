@@ -16,20 +16,20 @@ import (
 const (
 	rpcTimeout   = 10 * time.Second
 	requestEpoch = 10 * time.Millisecond
-	eventEpoch   = 100 * time.Millisecond
 )
 
 type Worker[F crdt.Flavor] struct {
-	replica     util.Replica
-	generator   generator.Generator[F]
-	kvs         Store[F]
-	requests    chan LeaderRequest
-	events      chan *pb.Event
-	hashRing    *consistent.Consistent
-	connections map[string]*grpc.ClientConn
-	cfg         util.Config
-	logger      *util.Logger
-	workers     []*Worker[F]
+	replica        util.Replica
+	generator      generator.Generator[F]
+	kvs            Store[F]
+	requests       chan LeaderRequest
+	events         chan *pb.Event
+	hashRing       *consistent.Consistent
+	connections    map[string]*grpc.ClientConn
+	cfg            util.Config
+	logger         *util.Logger
+	workers        []*Worker[F]
+	broadcastEpoch time.Duration
 }
 
 type LeaderRequest struct {
@@ -48,25 +48,27 @@ func New[F crdt.Flavor](replica util.Replica, generator generator.Generator[F], 
 	requestBufferSize := 100000
 	eventBufferSize := 100000
 	return &Worker[F]{
-		generator:   generator,
-		replica:     replica,
-		kvs:         NewCache[F](),
-		requests:    make(chan LeaderRequest, requestBufferSize),
-		events:      make(chan *pb.Event, eventBufferSize),
-		hashRing:    util.GetHashRing(),
-		connections: util.GetConnections(),
-		cfg:         cfg,
-		logger:      logger,
-		workers:     workers,
+		generator:      generator,
+		replica:        replica,
+		kvs:            NewCache[F](),
+		requests:       make(chan LeaderRequest, requestBufferSize),
+		events:         make(chan *pb.Event, eventBufferSize),
+		hashRing:       util.GetHashRing(),
+		connections:    util.GetConnections(),
+		cfg:            cfg,
+		logger:         logger,
+		workers:        workers,
+		broadcastEpoch: generator.BroadcastEpoch(),
 	}
 }
 
 func (w *Worker[F]) Start() {
 	// set of keys modified in this epoch
 	changeset := make(map[string]struct{})
-	for timeout := time.After(eventEpoch); ; {
+	ticker := time.NewTicker(w.broadcastEpoch)
+	for {
 		select {
-		case <-timeout:
+		case <-ticker.C:
 			for key := range changeset {
 				v, ok := w.kvs.Get(key)
 				if !ok {
@@ -77,7 +79,6 @@ func (w *Worker[F]) Start() {
 				go w.broadcast(e)
 			}
 			changeset = make(map[string]struct{})
-			timeout = time.After(eventEpoch)
 		case req := <-w.requests:
 			w.process(req)
 			if req.Inner.Operation != pb.OP_GETCOUNTER && req.Inner.Operation != pb.OP_GETSET {
