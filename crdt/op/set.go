@@ -11,9 +11,10 @@ var _ crdt.Set = &Set{}
 var _ crdt.CRDT[crdt.Op] = &Set{}
 
 type Set struct {
-	replica  util.Replica
-	elements map[string][]string
-	current  *pb.Event
+	replica     util.Replica
+	replicaName string
+	elements    map[string][]string
+	current     *pb.Event
 }
 
 func newSetEvent(replica util.Replica) *pb.Event {
@@ -28,16 +29,17 @@ func newSetEvent(replica util.Replica) *pb.Event {
 
 func NewSet(replica util.Replica) *Set {
 	return &Set{
-		replica:  replica,
-		elements: make(map[string][]string),
-		current:  newSetEvent(replica),
+		replica:     replica,
+		replicaName: replica.String(),
+		elements:    make(map[string][]string),
+		current:     newSetEvent(replica),
 	}
 }
 
 func (s *Set) Add(ctx *pb.Context, e string) {
 	var u string
 	if ctx.Dvv == nil || ctx.Dvv.Dot == nil {
-		u = (&pb.Dot{N: 0, Replica: s.replica.String()}).String()
+		u = (&pb.Dot{N: 0, Replica: s.replicaName}).String()
 	} else {
 		u = ctx.Dvv.Dot.String()
 	}
