@@ -46,7 +46,7 @@ func measureLatency(proxy *client.Proxy, n int) float64 {
 	return float64(latencies[int(.95*float64(len(latencies)))].Nanoseconds())
 }
 
-func measureThroughput(proxy *client.Proxy, n int, nSeconds int, stop chan bool, done chan bool) {
+func measureThroughput(proxy *client.Proxy, n int, stop chan bool, done chan bool) {
 	var wg sync.WaitGroup
 	stop <- false
 	for !<-stop {
@@ -71,7 +71,6 @@ func measureThroughput(proxy *client.Proxy, n int, nSeconds int, stop chan bool,
 
 func main() {
 	nops := flag.Int("nops", 10, "number of operations per second")
-	nSeconds := flag.Int("nsec", 20, "number of seconds to run (for throughput)")
 	mode := flag.String("mode", "t", "t/l")
 	flag.Parse()
 	proxy := client.NewProxy()
@@ -81,7 +80,7 @@ func main() {
 		var cts []time.Duration
 		stop := make(chan bool, 2)
 		done := make(chan bool, 1)
-		go measureThroughput(proxy, *nops, *nSeconds, stop, done)
+		go measureThroughput(proxy, *nops, stop, done)
 		nSamples := 5
 		time.Sleep(2 * time.Second)
 		p2 := client.NewProxy()
@@ -99,7 +98,7 @@ func main() {
 		var latencies []float64
 		stop := make(chan bool, 2)
 		done := make(chan bool, 1)
-		go measureThroughput(proxy, *nops, *nSeconds, stop, done)
+		go measureThroughput(proxy, *nops, stop, done)
 		nSamples := 5
 		time.Sleep(2 * time.Second)
 		p2 := client.NewProxy()
@@ -123,11 +122,3 @@ func median[T constraints.Ordered](lst []T) T {
 	})
 	return lst[int(.5*float64(len(lst)))]
 }
-
-// func mean(lst []float64) float64 {
-// 	sum := float64(0)
-// 	for _, l := range lst {
-// 		sum += l
-// 	}
-// 	return sum / float64(len(lst))
-// }
