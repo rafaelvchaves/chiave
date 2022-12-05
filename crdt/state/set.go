@@ -57,33 +57,22 @@ func addDots(elements map[string]*pb.Dots, e string, dots ...*pb.Dot) {
 		elements[e] = &pb.Dots{}
 	}
 	for _, d := range dots {
+		if containsDot(elements, e, d) {
+			continue
+		}
 		elements[e].Dots = append(elements[e].Dots, &pb.Dot{Replica: d.Replica, N: d.N})
 	}
-	// fmt.Printf("Dots for %s: %v\n", e, elements[e].Dots)
-
-	// fmt.Printf("Dots size: %d\n", len(elements[e].Dots))
-	// elements[e].Dots = append(elements[e].Dots, dots...)
 }
 
 func (s *Set) Add(ctx *pb.Context, e string) {
 	u := util.UpdateSingle(ctx.Dvv, s.state.DVV, s.replica.String())
-	// if s.replica.WorkerID == 0 {
-	// 	fmt.Printf("UpdateSingle(%v, %v) = %v\n", ctx.Dvv, s.state.DVV, u)
-	// }
 	switch util.Compare(ctx.Dvv, u) {
 	case util.LT:
 		s.state.DVV = u
-	if s.replica.WorkerID == 0 {
-		fmt.Printf("UpdateSingle(%v, %v) = %v\n", ctx.Dvv, s.state.DVV, u)
-	}
 	case util.CC:
 		s.state.DVV = util.Join(ctx.Dvv, u)
 	}
 	dot := u.Dot
-	// if s.replica.WorkerID == 0 {
-	// 	fmt.Printf("DVV after = %v\n", s.state.DVV)
-	// 	// fmt.Printf("element = %s, dot = %v\n", e, dot)
-	// }
 	addDots(s.state.Add, e, dot)
 	delete(s.state.Rem, e)
 }
@@ -119,9 +108,6 @@ func copyDotMap(m, cpy map[string]*pb.Dots) {
 		cpy[e] = &pb.Dots{
 			Dots: make([]*pb.Dot, len(dots)),
 		}
-		// for i, d := range dots {
-		// 	cpy[e].Dots[i] = d
-		// }
 		copy(cpy[e].Dots, dots)
 	}
 }
@@ -153,18 +139,11 @@ func (s *Set) PrepareEvent() *pb.Event {
 }
 
 func containsDot(m map[string]*pb.Dots, e string, dot *pb.Dot) bool {
-	d, ok := m[e]
-	if !ok {
-		return false
-	}
-	dots := d.Dots
-	for _, d := range dots {
+	for _, d := range m[e].GetDots() {
 		if d.Replica == dot.Replica && d.N == dot.N {
-			// fmt.Printf("%v contains %v\n", dots, dot)
 			return true
 		}
 	}
-	// fmt.Printf("%v does not contain %v\n", dots, dot)
 	return false
 }
 
@@ -182,29 +161,47 @@ func (s *Set) PersistEvent(event *pb.Event) {
 		}
 	}
 	for e, d := range ds.Add {
-		dots := d.Dots
 		if _, ok := s.state.Rem[e]; ok {
-			util.Filter(func(dot *pb.Dot) bool {
-				return !util.ContainedIn(dot, s.state.DVV) && !containsDot(s.state.Add, e, dot)
-			}, &dots)
+			d.Dots = util.Filter2(func(dot *pb.Dot) bool {
+				return !util.ContainedIn(dot, s.state.DVV)
+			}, d.Dots)
 		}
-		addDots(s.state.Add, e, dots...)
-		// fmt.Printf("add set = %v\n", s.state.Add[e].Dots)
+		addDots(s.state.Add, e, d.Dots...)
 	}
 	for e, d := range ds.Rem {
 		dots := d.Dots
 		if _, ok := s.state.Add[e]; ok {
-			util.Filter(func(dot *pb.Dot) bool {
-				return !util.ContainedIn(dot, s.state.DVV) && !containsDot(s.state.Rem, e, dot)
-			}, &dots)
+			dots = util.Filter2(func(dot *pb.Dot) bool {
+				return !util.ContainedIn(dot, s.state.DVV)
+			}, dots)
 		}
 		addDots(s.state.Rem, e, dots...)
 	}
+	for _, d := range s.state.Add {
+		d.Dots = util.Filter2(func(dot1 *pb.Dot) bool {
+			return !exists(d.Dots, func(dot2 *pb.Dot) bool {
+				return dot1.Replica == dot2.Replica && dot1.N < dot2.N
+			})
+		}, d.Dots)
+	}
+	for _, d := range s.state.Rem {
+		d.Dots = util.Filter2(func(dot1 *pb.Dot) bool {
+			return !exists(d.Dots, func(dot2 *pb.Dot) bool {
+				return dot1.Replica == dot2.Replica && dot1.N < dot2.N
+			})
+		}, d.Dots)
+	}
 	s.state.DVV = util.Sync(s.state.DVV, ds.DVV)
-	// s.printState(fmt.Sprintf("worker %s after persistevent from %s", s.replica, event.Source))
 }
 
-
+func exists[T comparable](lst []T, p func(T) bool) bool {
+	for _, x := range lst {
+		if p(x) {
+			return true
+		}
+	}
+	return false
+}
 
 func (s *Set) Context() *pb.Context {
 	dvv := &pb.DVV{
