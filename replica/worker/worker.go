@@ -84,9 +84,10 @@ func (w *Worker[F]) Start() {
 				changeset[req.Inner.Key] = struct{}{}
 			}
 		case event := <-w.events:
-			v := w.kvs.GetOrDefault(event.Key, w.generator.New(event.Datatype, w.replica))
+			key := event.Key
+			v := w.kvs.GetOrDefault(key, w.generator.New(event.Datatype, w.replica))
 			v.PersistEvent(event)
-			w.kvs.Put(event.Key, v)
+			w.kvs.Put(key, v)
 		}
 	}
 }

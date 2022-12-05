@@ -13,6 +13,13 @@ func ListToString(lst []string) string {
 }
 
 func Filter[T any](p func(T) bool, lst *[]T) {
+	// filtered := (*lst)[:0]
+	// for _, x := range *lst {
+	// 	if p(x) {
+	// 		filtered = append(filtered, x)
+	// 	}
+	// }
+	// *lst = filtered
 	i := 0
 	for _, x := range *lst {
 		if p(x) {
@@ -24,7 +31,7 @@ func Filter[T any](p func(T) bool, lst *[]T) {
 }
 
 func Filter2[T any](p func(T) bool, lst []T) []T {
-	var result []T
+	result := make([]T, 0, 3)
 	for _, x := range lst {
 		if p(x) {
 			result = append(result, x)

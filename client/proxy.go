@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	RPCTimeout = 10 * time.Second
+	RPCTimeout = 15 * time.Second
 )
 
 type Key interface {
@@ -97,9 +97,6 @@ func (p *Proxy) writeSync(key string, op pb.OP, args ...string) error {
 			d, ok := p.dvvs.Load(key)
 			if ok {
 				dvv = d.(*pb.DVV)
-			}
-			if r.WorkerID == 0 {
-				fmt.Printf("client context now: %s\n", util.String(util.Sync(dvv, res.Context.Dvv)))
 			}
 			p.dvvs.Store(key, util.Sync(dvv, res.Context.Dvv))
 			return nil
