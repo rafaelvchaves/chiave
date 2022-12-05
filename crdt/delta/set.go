@@ -89,8 +89,6 @@ func (s *Set) Remove(ctx *pb.Context, e string) {
 		addDots(s.state.Rem, e, dot)
 		addDots(s.delta.Rem, e, dot)
 	case util.CC:
-		fmt.Println("CC")
-		// filter out all dots in client context's causal history?
 		dots := getDots(s.state.Add, e)
 		util.Filter(func(dot *pb.Dot) bool {
 			return !util.ContainedIn(dot, ctx.Dvv)
