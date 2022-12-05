@@ -23,6 +23,16 @@ func Filter[T any](p func(T) bool, lst *[]T) {
 	*lst = (*lst)[:i]
 }
 
+func Filter2[T any](p func(T) bool, lst []T) []T {
+	var result []T
+	for _, x := range lst {
+		if p(x) {
+			result = append(result, x)
+		}
+	}
+	return result
+}
+
 func Contains[T comparable](target T, lst []T) bool {
 	for _, x := range lst {
 		if x == target {

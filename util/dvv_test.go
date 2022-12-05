@@ -12,14 +12,16 @@ func TestDVV(t *testing.T) {
 	// var client2Ctx *pb.DVV
 
 	replicaA := replica{id: "a", ctx: &pb.DVV{}}
-	replicaB := replica{id: "b", ctx: &pb.DVV{}}
+	// replicaB := replica{id: "b", ctx: &pb.DVV{}}
 
 	client1Ctx = replicaA.Update(client1Ctx)
-	client1Ctx = replicaB.Update(client1Ctx)
+	// client1Ctx = replicaB.Update(client1Ctx)
 	client1Ctx = replicaA.Update(client1Ctx)
-	client1Ctx = replicaB.Update(client1Ctx)
+	client1Ctx = replicaA.Update(client1Ctx)
 
-	fmt.Println(util.String(client1Ctx))
+	// client1Ctx = replicaB.Update(client1Ctx)
+
+	// fmt.Println(util.String(client1Ctx))
 }
 
 type replica struct {

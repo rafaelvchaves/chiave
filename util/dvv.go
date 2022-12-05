@@ -116,6 +116,9 @@ func ids(dvvs []*pb.DVV) []string {
 }
 
 func dvvCeil(dvv *pb.DVV, r string) int64 {
+	// if dvv == nil {
+	// 	return 0
+	// }
 	dot := dvv.Dot
 	if dot != nil && dot.Replica == r {
 		return max(dot.N, dvv.Clock[r])
@@ -145,15 +148,30 @@ func Update(S []*pb.DVV, S_r []*pb.DVV, r string) *pb.DVV {
 	return result
 }
 
+// func UpdateSingle(d1 *pb.DVV, d2 *pb.DVV, r string) *pb.DVV {
+// 	if d1 == nil && d2 == nil {
+// 		return Update(nil, nil, r)
+// 	} else if d1 == nil {
+// 		return Update(nil, []*pb.DVV{d2}, r)
+// 	} else if d2 == nil {
+// 		return Update([]*pb.DVV{d1}, nil, r)
+// 	}
+// 	return Update([]*pb.DVV{d1}, []*pb.DVV{d2}, r)
+// }
+
 func UpdateSingle(d1 *pb.DVV, d2 *pb.DVV, r string) *pb.DVV {
-	if d1 == nil && d2 == nil {
-		return Update(nil, nil, r)
-	} else if d1 == nil {
-		return Update(nil, []*pb.DVV{d2}, r)
-	} else if d2 == nil {
-		return Update([]*pb.DVV{d1}, nil, r)
+	result := &pb.DVV{
+		Dot: &pb.Dot{
+			Replica: r,
+			N:       dvvCeil(d2, r) + 1,
+		},
+		Clock: make(map[string]int64),
 	}
-	return Update([]*pb.DVV{d1}, []*pb.DVV{d2}, r)
+	// result.Clock[r] = dvvCeil(d1, r)
+	for _, i := range dvvIDs(d1) {
+		result.Clock[i] = dvvCeil(d1, i)
+	}
+	return result
 }
 
 func max[T constraints.Ordered](t1, t2 T) T {
