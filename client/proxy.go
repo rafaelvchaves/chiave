@@ -41,8 +41,7 @@ type Proxy struct {
 	connections map[string]*grpc.ClientConn
 	hashRing    *consistent.Consistent
 	repFactor   int
-	context     *pb.Context
-	mu          sync.Mutex
+	dvvs        *sync.Map
 }
 
 func NewProxy() *Proxy {
@@ -50,7 +49,7 @@ func NewProxy() *Proxy {
 		connections: util.GetConnections(),
 		hashRing:    util.GetHashRing(),
 		repFactor:   util.LoadConfig().RepFactor,
-		context:     &pb.Context{},
+		dvvs:        &sync.Map{},
 	}
 	return p
 }
@@ -77,9 +76,11 @@ func (p *Proxy) writeSync(key string, op pb.OP, args ...string) error {
 		client := pb.NewChiaveClient(p.connections[r.Addr])
 		ctx, cancel := context.WithTimeout(context.Background(), RPCTimeout)
 		defer cancel()
-		p.mu.Lock()
-		context := proto.Clone(p.context)
-		p.mu.Unlock()
+		var dvv *pb.DVV
+		d, ok := p.dvvs.Load(key)
+		if ok {
+			dvv = proto.Clone(d.(*pb.DVV)).(*pb.DVV)
+		}
 		var arg string
 		if len(args) > 0 {
 			arg = args[0]
@@ -89,12 +90,18 @@ func (p *Proxy) writeSync(key string, op pb.OP, args ...string) error {
 			WorkerId:  int32(r.WorkerID),
 			Operation: op,
 			Arg:       arg,
-			Context:   context.(*pb.Context),
+			Context:   &pb.Context{Dvv: dvv},
 		})
 		if err == nil {
-			p.mu.Lock()
-			p.context.Dvv = util.Sync(p.context.Dvv, res.Context.Dvv)
-			p.mu.Unlock()
+			var dvv *pb.DVV
+			d, ok := p.dvvs.Load(key)
+			if ok {
+				dvv = d.(*pb.DVV)
+			}
+			if r.WorkerID == 0 {
+				fmt.Printf("client context now: %s\n", util.String(util.Sync(dvv, res.Context.Dvv)))
+			}
+			p.dvvs.Store(key, util.Sync(dvv, res.Context.Dvv))
 			return nil
 		}
 		lastError = err
@@ -184,19 +191,24 @@ func (p *Proxy) GetSet(key ChiaveSet) ([]string, error) {
 		client := pb.NewChiaveClient(p.connections[r.Addr])
 		ctx, cancel := context.WithTimeout(context.Background(), RPCTimeout)
 		defer cancel()
-		p.mu.Lock()
-		context := proto.Clone(p.context)
-		p.mu.Unlock()
+		var dvv *pb.DVV
+		d, ok := p.dvvs.Load(key)
+		if ok {
+			dvv = proto.Clone(d.(*pb.DVV)).(*pb.DVV)
+		}
 		res, err := client.GetSet(ctx, &pb.Request{
 			Key:       k,
 			WorkerId:  int32(r.WorkerID),
 			Operation: pb.OP_GETSET,
-			Context:   context.(*pb.Context),
+			Context:   &pb.Context{Dvv: dvv},
 		})
 		if err == nil {
-			p.mu.Lock()
-			p.context.Dvv = util.Sync(p.context.Dvv, res.Context.Dvv)
-			p.mu.Unlock()
+			var dvv *pb.DVV
+			d, ok := p.dvvs.Load(key)
+			if ok {
+				dvv = d.(*pb.DVV)
+			}
+			p.dvvs.Store(key, util.Sync(dvv, res.Context.Dvv))
 			return res.Value, nil
 		}
 		lastError = err
