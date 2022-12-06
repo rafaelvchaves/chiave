@@ -2,15 +2,13 @@ package worker
 
 import (
 	"context"
+	"fmt"
 	"kvs/crdt"
 	"kvs/crdt/generator"
 	pb "kvs/proto"
 	"kvs/util"
 	"os"
 	"time"
-
-	"github.com/buraksezer/consistent"
-	"google.golang.org/grpc"
 )
 
 const (
@@ -18,17 +16,14 @@ const (
 )
 
 type Worker[F crdt.Flavor] struct {
-	replica        util.Replica
-	generator      generator.Generator[F]
-	kvs            Store[F]
-	requests       chan LeaderRequest
-	events         chan *pb.Event
-	hashRing       *consistent.Consistent
-	connections    map[string]*grpc.ClientConn
-	cfg            util.Config
-	logger         *util.Logger
-	workers        []*Worker[F]
-	broadcastEpoch time.Duration
+	replica     util.Replica
+	generator   generator.Generator[F]
+	kvs         Store[F]
+	requests    chan LeaderRequest
+	events      chan *pb.Event
+	broadcaster *Broadcaster[F]
+	logger      *util.Logger
+	config      Config[F]
 }
 
 type LeaderRequest struct {
@@ -42,31 +37,39 @@ type Response struct {
 	SetValue     []string
 }
 
-func New[F crdt.Flavor](replica util.Replica, generator generator.Generator[F], logger *util.Logger, workers []*Worker[F]) *Worker[F] {
-	cfg := util.LoadConfig()
+func New[F crdt.Flavor](replica util.Replica, generator generator.Generator[F], broadcaster *Broadcaster[F], config Config[F]) *Worker[F] {
 	requestBufferSize := 100000
 	eventBufferSize := 100000
 	return &Worker[F]{
-		generator:      generator,
-		replica:        replica,
-		kvs:            NewCache[F](),
-		requests:       make(chan LeaderRequest, requestBufferSize),
-		events:         make(chan *pb.Event, eventBufferSize),
-		hashRing:       util.GetHashRing(),
-		connections:    util.GetConnections(),
-		cfg:            cfg,
-		logger:         logger,
-		workers:        workers,
-		broadcastEpoch: generator.BroadcastEpoch(),
+		generator:   generator,
+		replica:     replica,
+		kvs:         NewCache[F](),
+		requests:    make(chan LeaderRequest, requestBufferSize),
+		events:      make(chan *pb.Event, eventBufferSize),
+		broadcaster: broadcaster,
+		config:      config,
 	}
 }
 
 func (w *Worker[F]) Start() {
 	// set of keys modified in this epoch
 	changeset := make(map[string]struct{})
-	ticker := time.NewTicker(w.broadcastEpoch)
+	ticker := time.NewTicker(w.generator.BroadcastEpoch())
 	for {
 		select {
+		// case req := <-w.requests:
+		// 	w.process(req)
+		// 	if req.Inner.Operation == pb.OP_GETCOUNTER || req.Inner.Operation == pb.OP_GETSET {
+		// 		continue
+		// 	}
+		// 	key := req.Inner.Key
+		// 	v, ok := w.kvs.Get(key)
+		// 	if !ok {
+		// 		continue
+		// 	}
+		// 	e := v.PrepareEvent()
+		// 	e.Key = key
+		// 	w.broadcaster.Send(e)
 		case <-ticker.C:
 			for key := range changeset {
 				v, ok := w.kvs.Get(key)
@@ -75,7 +78,8 @@ func (w *Worker[F]) Start() {
 				}
 				e := v.PrepareEvent()
 				e.Key = key
-				go w.broadcast(e)
+				w.broadcaster.Send(e)
+				// go w.broadcast(e)
 			}
 			changeset = make(map[string]struct{})
 		case req := <-w.requests:
@@ -157,7 +161,7 @@ func (w *Worker[F]) process(req LeaderRequest) {
 }
 
 func (w *Worker[F]) broadcast(event *pb.Event) {
-	owners, err := w.hashRing.GetClosestN([]byte(event.Key), w.cfg.RepFactor)
+	owners, err := w.config.HashRing.GetClosestN([]byte(event.Key), w.config.RepFactor)
 	if err != nil {
 		os.Exit(1)
 	}
@@ -167,16 +171,16 @@ func (w *Worker[F]) broadcast(event *pb.Event) {
 			continue
 		}
 		if v.Addr == w.replica.Addr {
-			w.workers[v.WorkerID].PutEvent(event)
+			w.config.Workers[v.WorkerID].PutEvent(event)
 			continue
 		}
 		event.Dest = int32(v.WorkerID)
-		client := pb.NewChiaveClient(w.connections[v.Addr])
+		client := pb.NewChiaveClient(w.config.Connections[v.Addr])
 		ctx, cancel := context.WithTimeout(context.Background(), rpcTimeout)
 		defer cancel()
 		_, err := client.ProcessEvent(ctx, event)
 		if err != nil {
-			w.logger.Errorf("ProcessEvent from %s to %s: %v", w.replica.String(), v.String(), err)
+			fmt.Printf("ProcessEvent from %s to %s: %v\n", w.replica.String(), v.String(), err)
 		}
 	}
 }

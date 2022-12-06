@@ -38,9 +38,10 @@ var toString = map[CRDTOption]string{
 
 type leader[F crdt.Flavor] struct {
 	pb.UnimplementedChiaveServer
-	addr    string
-	workers []*worker.Worker[F]
-	logger  *util.Logger
+	addr         string
+	workers      []*worker.Worker[F]
+	broadcasters []*worker.Broadcaster[F]
+	logger       *util.Logger
 }
 
 type Leader interface {
@@ -60,26 +61,36 @@ func NewLeader(addr string, opt CRDTOption) Leader {
 }
 
 func leaderWithFlavor[F crdt.Flavor](addr string, g generator.Generator[F]) *leader[F] {
-	l, err := util.NewLogger("log.txt")
+	logger, err := util.NewLogger("log.txt")
 	if err != nil {
 		panic(fmt.Sprintf("error creating logger: %v", err))
 	}
 	cfg := util.LoadConfig()
 	workers := make([]*worker.Worker[F], cfg.WorkersPerServer)
+	broadcasters := make([]*worker.Broadcaster[F], cfg.WorkersPerServer)
+	config := worker.Config[F]{
+		Workers:     workers,
+		Connections: util.GetConnections(),
+		HashRing:    util.GetHashRing(),
+		RepFactor:   cfg.RepFactor,
+	}
 	for i := 0; i < cfg.WorkersPerServer; i++ {
 		r := util.NewReplica(addr, i)
-		workers[i] = worker.New(r, g, l, workers)
+		broadcasters[i] = worker.NewBroadcaster(r, config)
+		workers[i] = worker.New(r, g, broadcasters[i], config)
 	}
 	return &leader[F]{
-		addr:    addr,
-		workers: workers,
-		logger:  l,
+		addr:         addr,
+		workers:      workers,
+		broadcasters: broadcasters,
+		logger:       logger,
 	}
 }
 
 func (l *leader[_]) StartWorkers() {
-	for _, w := range l.workers {
-		go w.Start()
+	for i := 0; i < len(l.workers); i++ {
+		go l.workers[i].Start()
+		go l.broadcasters[i].Start()
 	}
 }
 
