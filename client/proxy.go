@@ -6,7 +6,6 @@ import (
 	pb "kvs/proto"
 	"kvs/util"
 	"math/rand"
-	"sort"
 	"sync"
 	"time"
 
@@ -201,17 +200,7 @@ func (p *Proxy) GetSet(key ChiaveSet) ([]string, error) {
 }
 
 func compareSlice(a, b []string) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	sort.Slice(a, func(i, j int) bool { return a[i] < a[j] })
-	sort.Slice(b, func(i, j int) bool { return b[i] < b[j] })
-	for i, v := range a {
-		if v != b[i] {
-			return false
-		}
-	}
-	return true
+	return len(a) == len(b)
 }
 
 func (p *Proxy) GetConvergenceTime(key string, expected []string) (time.Duration, error) {
@@ -235,11 +224,12 @@ func (p *Proxy) GetConvergenceTime(key string, expected []string) (time.Duration
 					Operation: pb.OP_GETSET,
 				})
 				if err != nil {
-					fmt.Printf("error: %v", err)
+					fmt.Printf("error: %v\n", err)
 					continue
 				}
 				if !compareSlice(res.Value, expected) {
-					fmt.Printf("expected %v, got %v\n", expected, res.Value)
+					fmt.Println(len(expected), len(res.Value))
+					// fmt.Printf("expected %v, got %v\n", expected, res.Value)
 					continue
 				}
 				break
