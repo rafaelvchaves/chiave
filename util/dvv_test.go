@@ -17,7 +17,7 @@ func TestDVV(t *testing.T) {
 	client1Ctx = replicaA.Update(client1Ctx)
 	// client1Ctx = replicaB.Update(client1Ctx)
 	client1Ctx = replicaA.Update(client1Ctx)
-	client1Ctx = replicaA.Update(client1Ctx)
+	_ = replicaA.Update(client1Ctx)
 
 	// client1Ctx = replicaB.Update(client1Ctx)
 

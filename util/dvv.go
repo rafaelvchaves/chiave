@@ -3,8 +3,6 @@ package util
 import (
 	"fmt"
 	pb "kvs/proto"
-
-	"golang.org/x/exp/constraints"
 )
 
 type Ord int
@@ -79,6 +77,9 @@ func lt(d1, d2 *pb.DVV) bool {
 	if d1 == nil {
 		return true
 	}
+	if d2 == nil {
+		return false
+	}
 	dot := d1.Dot
 	return dot == nil || dot.N <= d2.Clock[dot.Replica]
 }
@@ -116,12 +117,9 @@ func ids(dvvs []*pb.DVV) []string {
 }
 
 func dvvCeil(dvv *pb.DVV, r string) int64 {
-	// if dvv == nil {
-	// 	return 0
-	// }
 	dot := dvv.Dot
 	if dot != nil && dot.Replica == r {
-		return max(dot.N, dvv.Clock[r])
+		return Max(dot.N, dvv.Clock[r])
 	}
 	return dvv.Clock[r]
 }
@@ -129,35 +127,10 @@ func dvvCeil(dvv *pb.DVV, r string) int64 {
 func ceil(dvvs []*pb.DVV, r string) int64 {
 	m := int64(0)
 	for _, dvv := range dvvs {
-		m = max(m, dvvCeil(dvv, r))
+		m = Max(m, dvvCeil(dvv, r))
 	}
 	return m
 }
-
-func Update(S []*pb.DVV, S_r []*pb.DVV, r string) *pb.DVV {
-	result := &pb.DVV{
-		Dot: &pb.Dot{
-			Replica: r,
-			N:       ceil(S_r, r) + 1,
-		},
-		Clock: make(map[string]int64),
-	}
-	for _, i := range ids(S) {
-		result.Clock[i] = ceil(S, i)
-	}
-	return result
-}
-
-// func UpdateSingle(d1 *pb.DVV, d2 *pb.DVV, r string) *pb.DVV {
-// 	if d1 == nil && d2 == nil {
-// 		return Update(nil, nil, r)
-// 	} else if d1 == nil {
-// 		return Update(nil, []*pb.DVV{d2}, r)
-// 	} else if d2 == nil {
-// 		return Update([]*pb.DVV{d1}, nil, r)
-// 	}
-// 	return Update([]*pb.DVV{d1}, []*pb.DVV{d2}, r)
-// }
 
 func UpdateSingle(d1 *pb.DVV, d2 *pb.DVV, r string) *pb.DVV {
 	result := &pb.DVV{
@@ -167,16 +140,8 @@ func UpdateSingle(d1 *pb.DVV, d2 *pb.DVV, r string) *pb.DVV {
 		},
 		Clock: make(map[string]int64),
 	}
-	// result.Clock[r] = dvvCeil(d1, r)
 	for _, i := range dvvIDs(d1) {
 		result.Clock[i] = dvvCeil(d1, i)
 	}
 	return result
-}
-
-func max[T constraints.Ordered](t1, t2 T) T {
-	if t1 > t2 {
-		return t1
-	}
-	return t2
 }
