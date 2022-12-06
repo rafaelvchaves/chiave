@@ -32,8 +32,10 @@ func measureConvergenceTime(proxy *client.Proxy) time.Duration {
 func measureLatency(proxy *client.Proxy, n int) float64 {
 	var latencies []time.Duration
 	for i := 0; i < n; i++ {
+		key := client.ChiaveSet(strconv.Itoa(i % 1000))
+		val := strconv.Itoa(i)
 		now := time.Now()
-		if err := proxy.RemoveSet(client.ChiaveSet(fmt.Sprint(i%1000)), fmt.Sprint(i)); err != nil {
+		if err := proxy.RemoveSet(key, val); err != nil {
 			fmt.Println(err)
 			os.Exit(1)
 		}
@@ -46,8 +48,9 @@ func measureLatency(proxy *client.Proxy, n int) float64 {
 	return float64(latencies[int(.95*float64(len(latencies)))].Nanoseconds())
 }
 
-func measureThroughput(proxy *client.Proxy, n int, stop chan bool, done chan bool) {
+func measureThroughput(proxy *client.Proxy, n int, stop chan bool, done chan bool, wp int) {
 	var wg sync.WaitGroup
+	q := 100 / wp
 	stop <- false
 	for !<-stop {
 		loopStart := time.Now()
@@ -55,10 +58,18 @@ func measureThroughput(proxy *client.Proxy, n int, stop chan bool, done chan boo
 			wg.Add(1)
 			go func(i int) {
 				defer wg.Done()
-				if err := proxy.AddSet(client.ChiaveSet(fmt.Sprint(i%1000)), fmt.Sprint(i)); err != nil {
-					fmt.Println(err)
-					os.Exit(1)
+				if i%q == 0 {
+					if err := proxy.AddSet(client.ChiaveSet(strconv.Itoa(i%100)), strconv.Itoa(i)); err != nil {
+						fmt.Println(err)
+						os.Exit(1)
+					}
+				} else {
+					if _, err := proxy.GetSet(client.ChiaveSet(strconv.Itoa(i % 100))); err != nil {
+						fmt.Println(err)
+						os.Exit(1)
+					}
 				}
+
 			}(i)
 		}
 		wg.Wait()
@@ -71,6 +82,7 @@ func measureThroughput(proxy *client.Proxy, n int, stop chan bool, done chan boo
 
 func main() {
 	nops := flag.Int("nops", 10, "number of operations per second")
+	wp := flag.Int("wp", 100, "percentage of writes in workload")
 	mode := flag.String("mode", "t", "t/l")
 	flag.Parse()
 	proxy := client.NewProxy()
@@ -80,7 +92,7 @@ func main() {
 		var cts []time.Duration
 		stop := make(chan bool, 2)
 		done := make(chan bool, 1)
-		go measureThroughput(proxy, *nops, stop, done)
+		go measureThroughput(proxy, *nops, stop, done, *wp)
 		nSamples := 5
 		time.Sleep(2 * time.Second)
 		p2 := client.NewProxy()
@@ -98,7 +110,7 @@ func main() {
 		var latencies []float64
 		stop := make(chan bool, 2)
 		done := make(chan bool, 1)
-		go measureThroughput(proxy, *nops, stop, done)
+		go measureThroughput(proxy, *nops, stop, done, *wp)
 		nSamples := 5
 		time.Sleep(2 * time.Second)
 		p2 := client.NewProxy()
