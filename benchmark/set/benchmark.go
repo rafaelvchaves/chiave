@@ -58,13 +58,14 @@ func measureThroughput(proxy *client.Proxy, n int, stop chan bool, done chan boo
 			wg.Add(1)
 			go func(i int) {
 				defer wg.Done()
+				key := client.ChiaveSet(strconv.Itoa(i % 100))
 				if i%q == 0 {
-					if err := proxy.AddSet(client.ChiaveSet(strconv.Itoa(i%100)), strconv.Itoa(i)); err != nil {
+					if err := proxy.AddSet(key, strconv.Itoa(i)); err != nil {
 						fmt.Println(err)
 						os.Exit(1)
 					}
 				} else {
-					if _, err := proxy.GetSet(client.ChiaveSet(strconv.Itoa(i % 100))); err != nil {
+					if _, err := proxy.GetSet(key); err != nil {
 						fmt.Println(err)
 						os.Exit(1)
 					}
