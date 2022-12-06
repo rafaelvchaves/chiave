@@ -65,6 +65,13 @@ func (p *Proxy) ownersOf(key string) ([]consistent.Member, error) {
 	return owners, nil
 }
 
+func (p *Proxy) getDVV(key string) *pb.DVV {
+	if d, ok := p.dvvs.Load(key); ok {
+		return proto.Clone(d.(*pb.DVV)).(*pb.DVV)
+	}
+	return nil
+}
+
 func (p *Proxy) writeSync(key string, op pb.OP, args ...string) error {
 	owners, err := p.ownersOf(key)
 	if err != nil {
@@ -76,11 +83,6 @@ func (p *Proxy) writeSync(key string, op pb.OP, args ...string) error {
 		client := pb.NewChiaveClient(p.connections[r.Addr])
 		ctx, cancel := context.WithTimeout(context.Background(), RPCTimeout)
 		defer cancel()
-		var dvv *pb.DVV
-		d, ok := p.dvvs.Load(key)
-		if ok {
-			dvv = proto.Clone(d.(*pb.DVV)).(*pb.DVV)
-		}
 		var arg string
 		if len(args) > 0 {
 			arg = args[0]
@@ -90,15 +92,10 @@ func (p *Proxy) writeSync(key string, op pb.OP, args ...string) error {
 			WorkerId:  int32(r.WorkerID),
 			Operation: op,
 			Arg:       arg,
-			Context:   &pb.Context{Dvv: dvv},
+			Context:   &pb.Context{Dvv: p.getDVV(key)},
 		})
 		if err == nil {
-			var dvv *pb.DVV
-			d, ok := p.dvvs.Load(key)
-			if ok {
-				dvv = d.(*pb.DVV)
-			}
-			p.dvvs.Store(key, util.Sync(dvv, res.Context.Dvv))
+			p.dvvs.Store(key, util.Sync(p.getDVV(key), res.Context.GetDvv()))
 			return nil
 		}
 		lastError = err
@@ -188,24 +185,14 @@ func (p *Proxy) GetSet(key ChiaveSet) ([]string, error) {
 		client := pb.NewChiaveClient(p.connections[r.Addr])
 		ctx, cancel := context.WithTimeout(context.Background(), RPCTimeout)
 		defer cancel()
-		var dvv *pb.DVV
-		d, ok := p.dvvs.Load(key)
-		if ok {
-			dvv = proto.Clone(d.(*pb.DVV)).(*pb.DVV)
-		}
 		res, err := client.GetSet(ctx, &pb.Request{
 			Key:       k,
 			WorkerId:  int32(r.WorkerID),
 			Operation: pb.OP_GETSET,
-			Context:   &pb.Context{Dvv: dvv},
+			Context:   &pb.Context{Dvv: p.getDVV(k)},
 		})
 		if err == nil {
-			var dvv *pb.DVV
-			d, ok := p.dvvs.Load(key)
-			if ok {
-				dvv = d.(*pb.DVV)
-			}
-			p.dvvs.Store(key, util.Sync(dvv, res.Context.Dvv))
+			p.dvvs.Store(key, util.Sync(p.getDVV(k), res.Context.GetDvv()))
 			return res.Value, nil
 		}
 		lastError = err
