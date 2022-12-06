@@ -13,15 +13,17 @@ import (
 	"golang.org/x/exp/constraints"
 )
 
-func measureConvergenceTime(proxy *client.Proxy) time.Duration {
-	setKey := client.ChiaveSet("set_key")
-	var expected []string
-	for i := 0; i < 20; i++ {
+func measureConvergenceTime(proxy *client.Proxy, i int) time.Duration {
+	keyName := "set_key_" + strconv.Itoa(i)
+	setKey := client.ChiaveSet(keyName)
+	expected := make([]string, 100000)
+	for i := 0; i < 100000; i++ {
 		element := strconv.Itoa(i)
 		proxy.AddSet(setKey, element)
-		expected = append(expected, element)
+		expected[i] = element
 	}
-	t, err := proxy.GetConvergenceTime("set_key", expected)
+	// fmt.Println(expected)
+	t, err := proxy.GetConvergenceTime(keyName, expected)
 	if err != nil {
 		fmt.Println(err)
 		return 0
@@ -99,7 +101,7 @@ func main() {
 		p2 := client.NewProxy()
 		defer p2.Cleanup()
 		for i := 0; i < nSamples; i++ {
-			ct := measureConvergenceTime(p2)
+			ct := measureConvergenceTime(p2, i)
 			cts = append(cts, ct)
 			fmt.Printf("convergence time: %v\n", ct)
 		}
