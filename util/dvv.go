@@ -61,6 +61,9 @@ func Join(D ...*pb.DVV) *pb.DVV {
 }
 
 func ContainedIn(dot *pb.Dot, dvv *pb.DVV) bool {
+	if dot == nil {
+		return true
+	}
 	return dot.N < dvv.Clock[dot.Replica] || (dvv.Dot.Replica == dot.Replica && dot.N <= dvv.Dot.N)
 }
 
