@@ -1,13 +1,10 @@
 package worker
 
 import (
-	"context"
-	"fmt"
 	"kvs/crdt"
 	"kvs/crdt/generator"
 	pb "kvs/proto"
 	"kvs/util"
-	"os"
 	"time"
 )
 
@@ -57,19 +54,6 @@ func (w *Worker[F]) Start() {
 	ticker := time.NewTicker(w.generator.BroadcastEpoch())
 	for {
 		select {
-		// case req := <-w.requests:
-		// 	w.process(req)
-		// 	if req.Inner.Operation == pb.OP_GETCOUNTER || req.Inner.Operation == pb.OP_GETSET {
-		// 		continue
-		// 	}
-		// 	key := req.Inner.Key
-		// 	v, ok := w.kvs.Get(key)
-		// 	if !ok {
-		// 		continue
-		// 	}
-		// 	e := v.PrepareEvent()
-		// 	e.Key = key
-		// 	w.broadcaster.Send(e)
 		case <-ticker.C:
 			for key := range changeset {
 				v, ok := w.kvs.Get(key)
@@ -79,7 +63,6 @@ func (w *Worker[F]) Start() {
 				e := v.PrepareEvent()
 				e.Key = key
 				w.broadcaster.Send(e)
-				// go w.broadcast(e)
 			}
 			changeset = make(map[string]struct{})
 		case req := <-w.requests:
@@ -160,32 +143,7 @@ func (w *Worker[F]) process(req LeaderRequest) {
 	}
 }
 
-func (w *Worker[F]) broadcast(event *pb.Event) {
-	owners, err := w.config.HashRing.GetClosestN([]byte(event.Key), w.config.RepFactor)
-	if err != nil {
-		os.Exit(1)
-	}
-	for _, o := range owners {
-		v := o.(util.Replica)
-		if v == w.replica {
-			continue
-		}
-		if v.Addr == w.replica.Addr {
-			w.config.Workers[v.WorkerID].PutEvent(event)
-			continue
-		}
-		event.Dest = int32(v.WorkerID)
-		client := pb.NewChiaveClient(w.config.Connections[v.Addr])
-		ctx, cancel := context.WithTimeout(context.Background(), rpcTimeout)
-		defer cancel()
-		_, err := client.ProcessEvent(ctx, event)
-		if err != nil {
-			fmt.Printf("ProcessEvent from %s to %s: %v\n", w.replica.String(), v.String(), err)
-		}
-	}
-}
-
-func (w *Worker[F]) logRequestHandle(key string, o pb.OP, arg string) {
+func (w *Worker[_]) logRequestHandle(key string, o pb.OP, arg string) {
 	w.logger.Infof("worker %d handling %s(%s) on key %q", w.replica.WorkerID, o.String(), arg, key)
 }
 

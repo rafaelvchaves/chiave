@@ -61,7 +61,7 @@ func (b *Broadcaster[F]) broadcast(event *pb.Event) {
 
 func (b Broadcaster[_]) Start() {
 	for event := range b.events {
-		go b.broadcast(event)
+		b.broadcast(event)
 	}
 }
 
