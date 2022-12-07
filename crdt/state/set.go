@@ -6,6 +6,8 @@ import (
 	pb "kvs/proto"
 	"kvs/util"
 	"strings"
+
+	"google.golang.org/protobuf/proto"
 )
 
 var _ crdt.Set = &Set{}
@@ -136,14 +138,14 @@ func (s *Set) PrepareEvent() *pb.Event {
 		Source:   s.replica.String(),
 		Datatype: pb.DT_Set,
 		Data: &pb.Event_StateSet{
-			StateSet: s.copy(),
+			StateSet: proto.Clone(s.state).(*pb.StateSet),
 		},
 	}
 }
 
 func containsDot(m map[string]*pb.Dots, e string, dot *pb.Dot) bool {
 	for _, d := range m[e].GetDots() {
-		if d.Replica == dot.Replica && d.N == dot.N {
+		if d.N == dot.N && d.Replica == dot.Replica {
 			return true
 		}
 	}
@@ -214,16 +216,16 @@ func exists[T comparable](lst []T, p func(T) bool) bool {
 }
 
 func (s *Set) Context() *pb.Context {
-	dvv := &pb.DVV{
-		Dot: &pb.Dot{
-			Replica: s.replica.String(),
-			N:       0,
-		},
-		Clock: make(map[string]int64),
-	}
-	copyDVV(s.state.DVV, dvv)
+	// dvv := &pb.DVV{
+	// 	Dot: &pb.Dot{
+	// 		Replica: s.replica.String(),
+	// 		N:       0,
+	// 	},
+	// 	Clock: make(map[string]int64),
+	// }
+	// copyDVV(s.state.DVV, dvv)
 	return &pb.Context{
-		Dvv: s.state.DVV,
+		Dvv: proto.Clone(s.state.DVV).(*pb.DVV),
 	}
 }
 
