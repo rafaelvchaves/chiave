@@ -3,8 +3,8 @@
   "workers_per_server": 10,
   "load": 1.5,
   "addresses": [
-        "ec2-44-201-8-245.compute-1.amazonaws.com:4747",
-        "ec2-3-216-124-178.compute-1.amazonaws.com:4747",
-        "ec2-75-101-192-124.compute-1.amazonaws.com:4747"
+    "ec2-44-201-8-245.compute-1.amazonaws.com:4747",
+    "ec2-3-216-124-178.compute-1.amazonaws.com:4747",
+    "ec2-75-101-192-124.compute-1.amazonaws.com:4747"
   ]
 }

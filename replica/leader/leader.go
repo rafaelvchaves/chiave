@@ -10,6 +10,7 @@ import (
 	"kvs/replica/worker"
 	"kvs/util"
 	"net"
+	"time"
 
 	"github.com/pkg/profile"
 	"google.golang.org/grpc"
@@ -95,6 +96,7 @@ func (l *leader[_]) StartWorkers() {
 }
 
 func (l *leader[_]) ProcessEvent(ctx context.Context, in *pb.Event) (*emptypb.Empty, error) {
+	fmt.Printf("ProcessEvent at time %v\n", time.Now())
 	l.workers[in.Dest].PutEvent(in)
 	return &emptypb.Empty{}, nil
 }
@@ -130,6 +132,7 @@ func isAsync(op pb.OP) bool {
 }
 
 func (l *leader[_]) Write(ctx context.Context, in *pb.Request) (*pb.Response, error) {
+	fmt.Printf("Write at time %v\n", time.Now())
 	if isAsync(in.Operation) {
 		req := worker.LeaderRequest{
 			Inner: in,
