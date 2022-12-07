@@ -124,7 +124,7 @@ func main() {
 			fmt.Printf("latency: %f\n", latency)
 		}
 		mu := median(latencies)
-		fmt.Println(latencies)
+		// fmt.Println(latencies)
 		fmt.Printf("%d,%d\n", int64(mu), *nops)
 		stop <- true
 		<-done

@@ -5,7 +5,6 @@ import (
 	"kvs/crdt"
 	pb "kvs/proto"
 	"kvs/util"
-	"strings"
 
 	"google.golang.org/protobuf/proto"
 )
@@ -105,34 +104,6 @@ func getDots(elements map[string]*pb.Dots, e string) *pb.Dots {
 	return d
 }
 
-func copyDotMap(m map[string]*pb.Dots, cpy map[string]*pb.Dots) {
-	for e, d := range m {
-		dots := d.Dots
-		cpy[e] = &pb.Dots{
-			Dots: make([]*pb.Dot, len(dots)),
-		}
-		for i, dot := range dots {
-			cpy[e].Dots[i] = &pb.Dot{Replica: strings.Clone(dot.Replica), N: dot.N}
-		}
-	}
-}
-
-func copyDVV(dvv, cpy *pb.DVV) {
-	cpy.Dot.Replica = dvv.Dot.Replica
-	cpy.Dot.N = dvv.Dot.N
-	for r, c := range dvv.Clock {
-		cpy.Clock[r] = c
-	}
-}
-
-func (s *Set) copy() *pb.StateSet {
-	cpy := newState(s.replica.String())
-	copyDotMap(s.state.Add, cpy.Add)
-	copyDotMap(s.state.Rem, cpy.Rem)
-	copyDVV(s.state.DVV, cpy.DVV)
-	return cpy
-}
-
 func (s *Set) PrepareEvent() *pb.Event {
 	return &pb.Event{
 		Source:   s.replica.String(),
@@ -216,14 +187,6 @@ func exists[T comparable](lst []T, p func(T) bool) bool {
 }
 
 func (s *Set) Context() *pb.Context {
-	// dvv := &pb.DVV{
-	// 	Dot: &pb.Dot{
-	// 		Replica: s.replica.String(),
-	// 		N:       0,
-	// 	},
-	// 	Clock: make(map[string]int64),
-	// }
-	// copyDVV(s.state.DVV, dvv)
 	return &pb.Context{
 		Dvv: proto.Clone(s.state.DVV).(*pb.DVV),
 	}
