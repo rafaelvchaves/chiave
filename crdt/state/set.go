@@ -5,6 +5,7 @@ import (
 	"kvs/crdt"
 	pb "kvs/proto"
 	"kvs/util"
+	"strings"
 )
 
 var _ crdt.Set = &Set{}
@@ -108,7 +109,9 @@ func copyDotMap(m, cpy map[string]*pb.Dots) {
 		cpy[e] = &pb.Dots{
 			Dots: make([]*pb.Dot, len(dots)),
 		}
-		copy(cpy[e].Dots, dots)
+		for i, dot := range dots {
+			cpy[e].Dots[i] = &pb.Dot{Replica: strings.Clone(dot.Replica), N: dot.N}
+		}
 	}
 }
 
