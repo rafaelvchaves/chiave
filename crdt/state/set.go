@@ -58,7 +58,7 @@ func addDots(elements map[string]*pb.Dots, e string, dots ...*pb.Dot) {
 		elements[e] = &pb.Dots{}
 	}
 	for _, d := range dots {
-		if containsDot(elements, e, d) {
+		if d == nil || containsDot(elements, e, d) {
 			continue
 		}
 		elements[e].Dots = append(elements[e].Dots, &pb.Dot{Replica: d.Replica, N: d.N})
@@ -103,7 +103,7 @@ func getDots(elements map[string]*pb.Dots, e string) *pb.Dots {
 	return d
 }
 
-func copyDotMap(m, cpy map[string]*pb.Dots) {
+func copyDotMap(m map[string]*pb.Dots, cpy map[string]*pb.Dots) {
 	for e, d := range m {
 		dots := d.Dots
 		cpy[e] = &pb.Dots{
@@ -153,7 +153,7 @@ func containsDot(m map[string]*pb.Dots, e string, dot *pb.Dot) bool {
 func (s *Set) PersistEvent(event *pb.Event) {
 	ds := event.GetStateSet()
 	if ds == nil {
-		fmt.Println("warning: nil delta set encountered in PersistEvent")
+		fmt.Println("warning: nil state set encountered in PersistEvent")
 		return
 	}
 	for e, d := range s.state.Add {
@@ -165,19 +165,26 @@ func (s *Set) PersistEvent(event *pb.Event) {
 	}
 	for e, d := range ds.Add {
 		if _, ok := s.state.Rem[e]; ok {
-			d.Dots = util.Filter2(func(dot *pb.Dot) bool {
+			dots := util.Filter2(func(dot *pb.Dot) bool {
 				return !util.ContainedIn(dot, s.state.DVV)
 			}, d.Dots)
+			addDots(s.state.Add, e, dots...)
+			continue
 		}
-		addDots(s.state.Add, e, d.Dots...)
+		dots := make([]*pb.Dot, len(d.Dots))
+		copy(dots, d.Dots)
+		addDots(s.state.Add, e, dots...)
 	}
 	for e, d := range ds.Rem {
-		dots := d.Dots
 		if _, ok := s.state.Add[e]; ok {
-			dots = util.Filter2(func(dot *pb.Dot) bool {
+			dots := util.Filter2(func(dot *pb.Dot) bool {
 				return !util.ContainedIn(dot, s.state.DVV)
-			}, dots)
+			}, d.Dots)
+			addDots(s.state.Rem, e, dots...)
+			continue
 		}
+		dots := make([]*pb.Dot, len(d.Dots))
+		copy(dots, d.Dots)
 		addDots(s.state.Rem, e, dots...)
 	}
 	for _, d := range s.state.Add {
