@@ -58,9 +58,6 @@ func addDots(elements map[string]*pb.Dots, e string, dots ...*pb.Dot) {
 	if _, ok := elements[e]; !ok {
 		elements[e] = &pb.Dots{}
 	}
-	if len(elements[e].GetDots()) > 3 {
-		fmt.Println(elements[e].GetDots())
-	}
 	for _, d := range dots {
 		if d == nil || containsDot(elements, e, d) {
 			continue
