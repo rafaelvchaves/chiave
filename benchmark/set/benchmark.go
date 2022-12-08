@@ -17,11 +17,18 @@ func measureConvergenceTime(proxy *client.Proxy, nops int, i int) time.Duration 
 	keyName := "set_key_" + strconv.Itoa(i)
 	setKey := client.ChiaveSet(keyName)
 	expected := make([]string, nops)
+	var wg sync.WaitGroup
 	for i := 0; i < nops; i++ {
+		wg.Add(1)
 		element := strconv.Itoa(i)
-		proxy.AddSet(setKey, element)
+		go func() {
+			proxy.AddSet(setKey, element)
+			wg.Done()
+		}()
 		expected[i] = element
 	}
+	wg.Wait()
+	// fmt.Println("starting...")
 	t, err := proxy.GetConvergenceTime(keyName, expected)
 	if err != nil {
 		fmt.Println(err)
@@ -102,7 +109,7 @@ func main() {
 		for i := 0; i < nSamples; i++ {
 			ct := measureConvergenceTime(p2, *nops, i)
 			cts = append(cts, ct)
-			fmt.Printf("convergence time: %v\n", ct)
+			// fmt.Printf("convergence time: %v\n", ct)
 		}
 		mu := median(cts)
 		fmt.Printf("%d,%d\n", int64(mu), *nops)
@@ -120,10 +127,8 @@ func main() {
 		for i := 0; i < nSamples; i++ {
 			latency := measureLatency(p2, 500)
 			latencies = append(latencies, latency)
-			// fmt.Printf("latency: %f\n", latency)
 		}
 		mu := median(latencies)
-		// fmt.Println(latencies)
 		fmt.Printf("%d,%d\n", int64(mu), *nops)
 		stop <- true
 		<-done
