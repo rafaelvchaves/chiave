@@ -215,6 +215,7 @@ func (p *Proxy) GetConvergenceTime(key string, expected []string) (time.Duration
 		r := owner.(util.Replica)
 		client := pb.NewChiaveClient(p.connections[r.Addr])
 		go func(client pb.ChiaveClient, workerID int32) {
+			defer wg.Done()
 			for {
 				ctx, cancel := context.WithTimeout(context.Background(), RPCTimeout)
 				defer cancel()
@@ -228,13 +229,12 @@ func (p *Proxy) GetConvergenceTime(key string, expected []string) (time.Duration
 					continue
 				}
 				if !compareSlice(res.Value, expected) {
-					fmt.Println(len(expected), len(res.Value))
+					// fmt.Println(len(expected), len(res.Value))
 					// fmt.Printf("expected %v, got %v\n", expected, res.Value)
 					continue
 				}
 				break
 			}
-			wg.Done()
 		}(client, int32(r.WorkerID))
 	}
 	wg.Wait()
