@@ -6,7 +6,7 @@ for ((d = 0; d < 3; d++)) do
 		if [[ $NOPS -gt 50000 ]]; then
 			break
 		fi
-		go run benchmark.go -mode a -wp 80 -nops $NOPS >> results_${TYPE}.csv
+		go run benchmark.go -mode a -wp 1 -nops $NOPS >> results_${TYPE}.csv
 		sleep 2
 	done
 done

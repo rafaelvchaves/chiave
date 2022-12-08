@@ -22,7 +22,6 @@ func measureConvergenceTime(proxy *client.Proxy, nops int, i int) time.Duration 
 		proxy.AddSet(setKey, element)
 		expected[i] = element
 	}
-	// fmt.Println(expected)
 	t, err := proxy.GetConvergenceTime(keyName, expected)
 	if err != nil {
 		fmt.Println(err)
