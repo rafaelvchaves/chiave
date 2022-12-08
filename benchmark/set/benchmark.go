@@ -94,32 +94,26 @@ func main() {
 	wp := flag.Int("wp", 100, "percentage of writes in workload")
 	mode := flag.String("mode", "t", "t/l")
 	flag.Parse()
-	proxy := client.NewProxy()
-	defer proxy.Cleanup()
 	switch *mode {
 	case "c":
 		var cts []time.Duration
-		stop := make(chan bool, 2)
-		done := make(chan bool, 1)
-		go measureThroughput(proxy, *nops, stop, done, *wp)
-		nSamples := 10
-		time.Sleep(2 * time.Second)
+		nSamples := 5
 		p2 := client.NewProxy()
 		defer p2.Cleanup()
 		for i := 0; i < nSamples; i++ {
 			ct := measureConvergenceTime(p2, *nops, i)
 			cts = append(cts, ct)
-			// fmt.Printf("convergence time: %v\n", ct)
+			fmt.Printf("convergence time: %v\n", ct)
 		}
-		mu := median(cts)
+		mu := mean(cts)
 		fmt.Printf("%d,%d\n", int64(mu), *nops)
-		stop <- true
-		<-done
 	default:
+		p1 := client.NewProxy()
+		defer p1.Cleanup()
 		var latencies []float64
 		stop := make(chan bool, 2)
 		done := make(chan bool, 1)
-		go measureThroughput(proxy, *nops, stop, done, *wp)
+		go measureThroughput(p1, *nops, stop, done, *wp)
 		nSamples := 5
 		time.Sleep(2 * time.Second)
 		p2 := client.NewProxy()
@@ -140,4 +134,12 @@ func median[T constraints.Ordered](lst []T) T {
 		return lst[i] < lst[j]
 	})
 	return lst[int(.5*float64(len(lst)))]
+}
+
+func mean(lst []time.Duration) float64 {
+	sum := float64(0)
+	for _, v := range lst {
+		sum += float64(v.Nanoseconds())
+	}
+	return sum / float64(len(lst))
 }
