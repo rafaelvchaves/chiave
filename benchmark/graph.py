@@ -8,8 +8,6 @@ rc('mathtext', **{'default':'regular'})
 
 graph = 'conv'
 
-# plt.hlines(23, 0, 50000, linestyles='dashed', label='baseline latency', color='k')
-
 df_op = pd.read_csv(f'set/results_op_{graph}.csv')
 df_op.sort_values(by='size', inplace=True)
 plt.plot(df_op['size'], df_op['time'] / 1000000, label='op')

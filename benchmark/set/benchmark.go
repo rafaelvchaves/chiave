@@ -28,7 +28,6 @@ func measureConvergenceTime(proxy *client.Proxy, nops int, i int) time.Duration 
 		expected[i] = element
 	}
 	wg.Wait()
-	// fmt.Println("starting...")
 	t, err := proxy.GetConvergenceTime(keyName, expected)
 	if err != nil {
 		fmt.Println(err)
@@ -103,7 +102,6 @@ func main() {
 		for i := 0; i < nSamples; i++ {
 			ct := measureConvergenceTime(p2, *nops, i)
 			cts = append(cts, ct)
-			fmt.Printf("convergence time: %v\n", ct)
 		}
 		mu := mean(cts)
 		fmt.Printf("%d,%d\n", int64(mu), *nops)
