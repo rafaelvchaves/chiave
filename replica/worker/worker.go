@@ -75,8 +75,6 @@ func (w *Worker[F]) Start() {
 			v := w.kvs.GetOrDefault(key, w.generator.New(event.Datatype, w.replica))
 			v.PersistEvent(event)
 			w.kvs.Put(key, v)
-		default:
-			continue
 		}
 	}
 }
