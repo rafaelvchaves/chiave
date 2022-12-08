@@ -57,6 +57,10 @@ func (w *Worker[F]) Start() {
 		select {
 		case <-ticker.C:
 			fmt.Println(len(w.requests), len(w.events))
+			if len(w.requests) > 0 {
+				newEpoch := len(w.requests) / 10
+				ticker = time.NewTicker(time.Duration(newEpoch) * time.Millisecond)
+			}
 			for key := range changeset {
 				v, ok := w.kvs.Get(key)
 				if !ok {
