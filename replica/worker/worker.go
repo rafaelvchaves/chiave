@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	rpcTimeout = 10 * time.Second
+	rpcTimeout = 60 * time.Second
 )
 
 type Worker[F crdt.Flavor] struct {
