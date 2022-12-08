@@ -121,7 +121,7 @@ func main() {
 		for i := 0; i < nSamples; i++ {
 			latency := measureLatency(p2, 500)
 			latencies = append(latencies, latency)
-			fmt.Printf("latency: %f\n", latency)
+			// fmt.Printf("latency: %f\n", latency)
 		}
 		mu := median(latencies)
 		// fmt.Println(latencies)
