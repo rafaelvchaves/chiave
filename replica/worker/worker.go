@@ -51,20 +51,20 @@ func New[F crdt.Flavor](replica util.Replica, generator generator.Generator[F], 
 func (w *Worker[F]) Start() {
 	// set of keys modified in this epoch
 	changeset := make(map[string]struct{})
-	// ticker := time.NewTicker(w.generator.BroadcastEpoch())
+	ticker := time.NewTicker(w.generator.BroadcastEpoch())
 	for {
 		select {
-		// case <-ticker.C:
-		// 	for key := range changeset {
-		// 		v, ok := w.kvs.Get(key)
-		// 		if !ok {
-		// 			continue
-		// 		}
-		// 		e := v.PrepareEvent()
-		// 		e.Key = key
-		// 		w.broadcaster.Send(e)
-		// 	}
-		// 	changeset = make(map[string]struct{})
+		case <-ticker.C:
+			for key := range changeset {
+				v, ok := w.kvs.Get(key)
+				if !ok {
+					continue
+				}
+				e := v.PrepareEvent()
+				e.Key = key
+				w.broadcaster.Send(e)
+			}
+			changeset = make(map[string]struct{})
 		case req := <-w.requests:
 			w.process(req)
 			if req.Inner.Operation != pb.OP_GETCOUNTER && req.Inner.Operation != pb.OP_GETSET {
@@ -76,16 +76,7 @@ func (w *Worker[F]) Start() {
 			v.PersistEvent(event)
 			w.kvs.Put(key, v)
 		default:
-			for key := range changeset {
-				v, ok := w.kvs.Get(key)
-				if !ok {
-					continue
-				}
-				e := v.PrepareEvent()
-				e.Key = key
-				w.broadcaster.Send(e)
-			}
-			changeset = make(map[string]struct{})
+			continue
 		}
 	}
 }
