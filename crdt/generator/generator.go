@@ -27,7 +27,7 @@ func (Delta) New(dt pb.DT, r util.Replica) crdt.CRDT[crdt.Delta] {
 }
 
 func (Delta) BroadcastEpoch() time.Duration {
-	return 1000 * time.Millisecond
+	return 100 * time.Millisecond
 }
 
 type Op struct{}
@@ -42,7 +42,7 @@ func (Op) New(dt pb.DT, r util.Replica) crdt.CRDT[crdt.Op] {
 }
 
 func (Op) BroadcastEpoch() time.Duration {
-	return 1000 * time.Millisecond
+	return 100 * time.Millisecond
 }
 
 type State struct{}
@@ -57,5 +57,5 @@ func (State) New(dt pb.DT, r util.Replica) crdt.CRDT[crdt.State] {
 }
 
 func (State) BroadcastEpoch() time.Duration {
-	return 1000 * time.Millisecond
+	return 100 * time.Millisecond
 }
