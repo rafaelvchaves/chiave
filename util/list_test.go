@@ -28,7 +28,7 @@ func TestList(t *testing.T) {
 	util.Filter(func(dot *pb.Dot) bool {
 		return dot.N >= 2
 	}, &lst)
-	if len(lst) != 2 {
-		t.Errorf("len(lst): expected %d, got %d", 2, len(lst))
+	if len(lst) != 3 {
+		t.Errorf("len(lst): expected %d, got %d", 3, len(lst))
 	}
 }
