@@ -102,7 +102,7 @@ func main() {
 		stop := make(chan bool, 2)
 		done := make(chan bool, 1)
 		go measureThroughput(proxy, *nops, stop, done, *wp)
-		nSamples := 5
+		nSamples := 10
 		time.Sleep(2 * time.Second)
 		p2 := client.NewProxy()
 		defer p2.Cleanup()
