@@ -1,6 +1,7 @@
 package worker
 
 import (
+	"fmt"
 	"kvs/crdt"
 	"kvs/crdt/generator"
 	pb "kvs/proto"
@@ -35,8 +36,8 @@ type Response struct {
 }
 
 func New[F crdt.Flavor](replica util.Replica, generator generator.Generator[F], broadcaster *Broadcaster[F], config Config[F]) *Worker[F] {
-	requestBufferSize := 100000
-	eventBufferSize := 100000
+	requestBufferSize := 1000000
+	eventBufferSize := 1000000
 	return &Worker[F]{
 		generator:   generator,
 		replica:     replica,
@@ -55,6 +56,7 @@ func (w *Worker[F]) Start() {
 	for {
 		select {
 		case <-ticker.C:
+			fmt.Println(len(w.requests), len(w.events))
 			for key := range changeset {
 				v, ok := w.kvs.Get(key)
 				if !ok {
