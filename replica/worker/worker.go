@@ -55,7 +55,7 @@ func (w *Worker[F]) Start() {
 	for {
 		select {
 		case <-ticker.C:
-			if len(w.requests) > 0 {
+			if len(w.requests) > 10 {
 				newEpoch := len(w.requests) / 10
 				ticker = time.NewTicker(time.Duration(newEpoch) * time.Millisecond)
 			}
