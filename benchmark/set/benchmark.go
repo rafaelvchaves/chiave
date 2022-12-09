@@ -151,11 +151,3 @@ func median[T constraints.Ordered](lst []T) T {
 	})
 	return lst[int(.5*float64(len(lst)))]
 }
-
-func mean(lst []time.Duration) float64 {
-	sum := float64(0)
-	for _, v := range lst {
-		sum += float64(v.Nanoseconds())
-	}
-	return sum / float64(len(lst))
-}
