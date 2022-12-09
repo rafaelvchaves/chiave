@@ -123,25 +123,6 @@ func containsDot(m map[string]*pb.Dots, e string, dot *pb.Dot) bool {
 	return false
 }
 
-func (s *Set) cleanState() {
-	for _, d := range s.state.Add {
-		dots := d.GetDots()
-		// new := make([]*pb.Dot, 0, len(dots))
-		for i := 0; i < len(dots); i++ {
-			for j := i + 1; j < len(dots); j++ {
-				if dots[i].Replica == dots[j].Replica {
-
-				}
-			}
-		}
-		// d.Dots = util.Filter2(func(dot1 *pb.Dot) bool {
-		// 	return !exists(d.Dots, func(dot2 *pb.Dot) bool {
-		// 		return dot1.Replica == dot2.Replica && dot1.N < dot2.N
-		// 	})
-		// }, d.Dots)
-	}
-}
-
 func (s *Set) PersistEvent(event *pb.Event) {
 	ds := event.GetStateSet()
 	if ds == nil {

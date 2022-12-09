@@ -1,1 +1,1 @@
-go run benchmark.go -mode c -nops $2 >> results_$1_conv.csv
+go run benchmark.go -mode c -nops $2 >> results_$1_conv2.csv

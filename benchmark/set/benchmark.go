@@ -17,17 +17,17 @@ func measureConvergenceTime(proxy *client.Proxy, nops int, i int) time.Duration 
 	keyName := "set_key_" + strconv.Itoa(i)
 	setKey := client.ChiaveSet(keyName)
 	expected := make([]string, nops)
-	var wg sync.WaitGroup
+	// var wg sync.WaitGroup
 	for i := 0; i < nops; i++ {
-		wg.Add(1)
+		// wg.Add(1)
 		element := strconv.Itoa(i)
 		go func() {
 			proxy.AddSet(setKey, element)
-			wg.Done()
+			// wg.Done()
 		}()
 		expected[i] = element
 	}
-	wg.Wait()
+	// wg.Wait()
 	t, err := proxy.GetConvergenceTime(keyName, expected)
 	if err != nil {
 		fmt.Println(err)
@@ -95,36 +95,54 @@ func main() {
 	flag.Parse()
 	switch *mode {
 	case "c":
-		var cts []time.Duration
-		nSamples := 5
-		p2 := client.NewProxy()
-		defer p2.Cleanup()
-		for i := 0; i < nSamples; i++ {
-			ct := measureConvergenceTime(p2, *nops, i)
-			cts = append(cts, ct)
-		}
-		mu := mean(cts)
-		fmt.Printf("%d,%d\n", int64(mu), *nops)
-	default:
-		p1 := client.NewProxy()
-		defer p1.Cleanup()
-		var latencies []float64
 		stop := make(chan bool, 2)
 		done := make(chan bool, 1)
+		p1 := client.NewProxy()
+		defer p1.Cleanup()
+		go measureThroughput(p1, *nops, stop, done, *wp)
+		nSamples := 20
+		time.Sleep(3 * time.Second)
+		p2 := client.NewProxy()
+		defer p2.Cleanup()
+		var cts []time.Duration
+		for i := 0; i < nSamples; i++ {
+			ct := measureConvergenceTime(p2, 10000, i)
+			cts = append(cts, ct)
+			fmt.Println(ct)
+			time.Sleep(2 * time.Second)
+		}
+		mu := p95(cts)
+		fmt.Printf("%d,%d\n", int64(mu), *nops)
+		stop <- true
+		<-done
+	default:
+		stop := make(chan bool, 2)
+		done := make(chan bool, 1)
+		p1 := client.NewProxy()
+		defer p1.Cleanup()
 		go measureThroughput(p1, *nops, stop, done, *wp)
 		nSamples := 5
 		time.Sleep(2 * time.Second)
 		p2 := client.NewProxy()
 		defer p2.Cleanup()
+		var latencies []float64
 		for i := 0; i < nSamples; i++ {
 			latency := measureLatency(p2, 500)
 			latencies = append(latencies, latency)
+			fmt.Println(time.Duration(latency))
 		}
 		mu := median(latencies)
 		fmt.Printf("%d,%d\n", int64(mu), *nops)
 		stop <- true
 		<-done
 	}
+}
+
+func p95[T constraints.Ordered](lst []T) T {
+	sort.Slice(lst, func(i, j int) bool {
+		return lst[i] < lst[j]
+	})
+	return lst[int(.95*float64(len(lst)))]
 }
 
 func median[T constraints.Ordered](lst []T) T {
